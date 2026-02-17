@@ -27,12 +27,20 @@
         <span class="brand-name">Nutristika</span>
       </a>
       <nav class="desktop-nav" aria-label="Primary">
-        <a href="#story">Story</a>
-        <a href="#products">Programs</a>
-        <a href="#benefits">Benefits</a>
-        <a href="#faq">FAQ</a>
+        <a href="#story" data-i18n="nav.story">Story</a>
+        <a href="#products" data-i18n="nav.programs">Programs</a>
+        <a href="#benefits" data-i18n="nav.benefits">Benefits</a>
+        <a href="#faq" data-i18n="nav.faq">FAQ</a>
+        <a href="#inquiry" data-i18n="nav.contact">Contact</a>
       </nav>
-      <a class="btn btn-accent" href="#cta">BOOK A FREE CALL</a>
+      <div class="lang-switch lang-switch--desktop">
+        <label for="language-switch" class="sr-only" data-i18n="lang.label">Language</label>
+        <div class="lang-options" role="group" aria-label="Language selector">
+          <button class="lang-btn is-active" type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button class="lang-btn" type="button" data-lang="de" aria-pressed="false">DE</button>
+        </div>
+      </div>
+      <a class="btn btn-accent" href="#cta" data-i18n="header.cta">BOOK A FREE CALL</a>
       <button
         class="menu-toggle"
         id="menu-toggle"
@@ -49,20 +57,30 @@
 
     <div id="mobile-menu" class="mobile-menu" hidden>
       <nav class="mobile-nav" aria-label="Mobile">
-        <a href="#story">Story</a>
-        <a href="#products">Programs</a>
-        <a href="#benefits">Benefits</a>
-        <a href="#faq">FAQ</a>
+        <a href="#story" data-i18n="nav.story">Story</a>
+        <a href="#products" data-i18n="nav.programs">Programs</a>
+        <a href="#benefits" data-i18n="nav.benefits">Benefits</a>
+        <a href="#faq" data-i18n="nav.faq">FAQ</a>
+        <a href="#inquiry" data-i18n="nav.contact">Contact</a>
       </nav>
+      <div class="mobile-menu-lang">
+        <div class="lang-switch lang-switch--mobile">
+          <label for="language-switch-mobile" class="sr-only" data-i18n="lang.label">Language</label>
+          <div class="lang-options" role="group" aria-label="Language selector">
+            <button class="lang-btn is-active" type="button" data-lang="en" aria-pressed="true">EN</button>
+            <button class="lang-btn" type="button" data-lang="de" aria-pressed="false">DE</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <main id="top">
       <section class="hero">
         <div class="hero-headline">
-          <span class="hero-word w1">SIMPLE</span>
-          <span class="hero-word w2">HABITS.</span>
-          <span class="hero-word w3">LASTING</span>
-          <span class="hero-word w4">Health.</span>
+          <span class="hero-word w1" data-i18n="hero.word1">SIMPLE</span>
+          <span class="hero-word w2" data-i18n="hero.word2">HABITS.</span>
+          <span class="hero-word w3" data-i18n="hero.word3">LASTING</span>
+          <span class="hero-word w4" data-i18n="hero.word4">Health.</span>
         </div>
 
         <div class="hero-float f1">
@@ -94,17 +112,17 @@
             />
             <img
               class="hero-slide"
-              src="https://images.unsplash.com/photo-1647918516017-fa75cbd0af0d?q=80&w=1600&auto=format&fit=crop"
+              src="https://images.unsplash.com/photo-1646907856259-6dc0aab76632?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
               alt="A bowl of food on a table with a spoon"
             />
             <img
               class="hero-slide"
-              src="https://images.unsplash.com/photo-1633204339691-9d3645430e14?q=80&w=1600&auto=format&fit=crop"
+              src="https://images.unsplash.com/photo-1602554172650-043a2de54271?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjkxfHx2ZWdhbiUyMGZvb2R8ZW58MHx8MHx8fDI%3D"
               alt="A piece of cake on a plate"
             />
             <img
               class="hero-slide"
-              src="https://images.unsplash.com/photo-1641579718751-bffd1f0789be?q=80&w=1600&auto=format&fit=crop"
+              src="https://images.unsplash.com/photo-1600398138360-ae1ac2285bc3?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OTZ8fGJyZWFkfGVufDB8fDB8fHwy"
               alt="A bowl of food sitting on top of a wooden table"
             />
             <img
@@ -135,13 +153,13 @@
           </div>
           <p class="hero-person" aria-label="Practitioner name and title">
             <span class="hero-person-name">Jasmina Klisch</span>
-            <span class="hero-person-title">Registered Dietitian Nutritionist</span>
+            <span class="hero-person-title" data-i18n="hero.person.title">Registered Dietitian Nutritionist</span>
           </p>
         </div>
 
         <div class="hero-cta">
-          <p class="eyebrow">Registered Dietitian Nutritionist</p>
-          <a class="btn btn-accent" href="#products">Explore Programs</a>
+          <p class="eyebrow" data-i18n="hero.eyebrow">Registered Dietitian Nutritionist</p>
+          <a class="btn btn-accent" href="#products" data-i18n="hero.cta">Explore Programs</a>
         </div>
       </section>
 
@@ -152,35 +170,35 @@
       </section>
 
       <section id="story" class="story">
-        <h2>We’re more than a meal plan.</h2>
-        <p>I support adults who want to feel better in their bodies without restrictive diets or quick fixes. As a registered dietitian, I combine evidence-based nutrition, plant-forward culinary guidance, and behavior coaching to help you create habits that truly last.</p>
-        <p class="mission-goal">My goal is simple: empower you to <span class="hand-highlight">take control of your health</span> with clarity and confidence.</p>
+        <h2 data-i18n="story.title">We’re more than a meal plan.</h2>
+        <p data-i18n="story.body">I support adults who want to feel better in their bodies without restrictive diets or quick fixes. As a registered dietitian, I combine evidence-based nutrition, plant-forward culinary guidance, and behavior coaching to help you create habits that truly last.</p>
+        <p class="mission-goal" data-i18n="story.goal">My goal is simple: empower you to take control of your health with clarity and confidence.</p>
         <div class="story-grid">
           <article>
             <span class="material-symbols-outlined story-icon" aria-hidden="true">check_circle</span>
-            <h3>Easy</h3>
-            <p>Simple weekly systems that work in real life.</p>
+            <h3 data-i18n="story.card1.title">Easy</h3>
+            <p data-i18n="story.card1.text">Simple weekly systems that work in real life.</p>
           </article>
           <article>
             <span class="material-symbols-outlined story-icon" aria-hidden="true">restaurant</span>
-            <h3>Tasty</h3>
-            <p>Balanced food that feels satisfying, not restrictive.</p>
+            <h3 data-i18n="story.card2.title">Tasty</h3>
+            <p data-i18n="story.card2.text">Balanced food that feels satisfying, not restrictive.</p>
           </article>
           <article>
             <span class="material-symbols-outlined story-icon" aria-hidden="true">bolt</span>
-            <h3>Quick</h3>
-            <p>Fast, practical actions you can use right away on busy days.</p>
+            <h3 data-i18n="story.card3.title">Quick</h3>
+            <p data-i18n="story.card3.text">Fast, practical actions you can use right away on busy days.</p>
           </article>
           <article>
             <span class="material-symbols-outlined story-icon" aria-hidden="true">eco</span>
-            <h3>Sustainable</h3>
-            <p>Simple habits designed to last long-term, not just for a few weeks.</p>
+            <h3 data-i18n="story.card4.title">Sustainable</h3>
+            <p data-i18n="story.card4.text">Simple habits designed to last long-term, not just for a few weeks.</p>
           </article>
         </div>
       </section>
 
       <section id="products" class="products reveal-alt">
-        <h2>Services designed for lasting change</h2>
+        <h2 data-i18n="services.title">Services designed for lasting change</h2>
         <div class="cards" data-stagger>
           <article class="product-card">
             <img
@@ -188,10 +206,10 @@
               src="https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=1200&auto=format&fit=crop"
               alt="Fresh salad bowl with grains"
             />
-            <span>Personalized</span>
-            <h3>1:1 Nutrition Coaching</h3>
-            <p>Personalized guidance focused on sustainable change.</p>
-            <a href="#cta">Learn more →</a>
+            <span data-i18n="services.card1.badge">Personalized</span>
+            <h3 data-i18n="services.card1.title">1:1 Nutrition Coaching</h3>
+            <p data-i18n="services.card1.text">Personalized guidance focused on sustainable change.</p>
+            <a href="#cta" data-i18n="services.card1.cta">Learn more →</a>
           </article>
           <article class="product-card featured">
             <img
@@ -199,10 +217,10 @@
               src="https://images.unsplash.com/photo-1505253758473-96b7015fcd40?q=80&w=1200&auto=format&fit=crop"
               alt="Vegan meal prep bowls with grains and vegetables"
             />
-            <span>Most Popular</span>
-            <h3>Signature Coaching Program</h3>
-            <p>Step-by-step support for lasting health transformation.</p>
-            <a href="#cta">Discover more →</a>
+            <span data-i18n="services.card2.badge">Most Popular</span>
+            <h3 data-i18n="services.card2.title">Signature Coaching Program</h3>
+            <p data-i18n="services.card2.text">Step-by-step support for lasting health transformation.</p>
+            <a href="#cta" data-i18n="services.card2.cta">Discover more →</a>
           </article>
           <article class="product-card">
             <img
@@ -210,60 +228,60 @@
               src="https://images.unsplash.com/photo-1547592166-23ac45744acd?q=80&w=1200&auto=format&fit=crop"
               alt="Vegan quinoa bowl with roasted vegetables"
             />
-            <span>Practical</span>
-            <h3>Meal Planning &amp; Kitchen Skills</h3>
-            <p>Simple systems to make healthy eating easier.</p>
-            <a href="#cta">Get started →</a>
+            <span data-i18n="services.card3.badge">Practical</span>
+            <h3 data-i18n="services.card3.title">Meal Planning &amp; Kitchen Skills</h3>
+            <p data-i18n="services.card3.text">Simple systems to make healthy eating easier.</p>
+            <a href="#cta" data-i18n="services.card3.cta">Get started →</a>
           </article>
         </div>
       </section>
 
       <section id="benefits" class="quotes reveal-alt">
-        <h2>Don’t just trust us — trust results.</h2>
+        <h2 data-i18n="quotes.title">Don’t just trust us — trust results.</h2>
         <div class="quotes-grid">
           <blockquote>
-            “I finally stopped starting over every Monday. The structure is simple and it works.”
-            <cite>— Miriam, Project Cordinatior</cite>
+            <span data-i18n="quotes.q1">“I finally stopped starting over every Monday. The structure is simple and it works.”</span>
+            <cite data-i18n="quotes.c1">— Miriam, Project Cordinatior</cite>
           </blockquote>
           <blockquote>
-            “Energy is up, inflammation is down, and meal prep takes half the time now.”
-            <cite>— Aleksandar, Designer</cite>
+            <span data-i18n="quotes.q2">“Energy is up, inflammation is down, and meal prep takes half the time now.”</span>
+            <cite data-i18n="quotes.c2">— Aleksandar, Designer</cite>
           </blockquote>
         </div>
         <div class="quotes-gallery">
           <img
             class="leaf-image"
-            src="https://images.unsplash.com/photo-1511690656952-34342bb7c2f2?q=80&w=1200&auto=format&fit=crop"
-            alt="Colorful vegan bowl with vegetables and grains"
+            src="https://images.unsplash.com/photo-1596723455658-72ebb0d12edd?q=80&w=1200&auto=format&fit=crop"
+            alt="Brown and white chocolate cupcakes"
           />
           <img
             class="leaf-image"
-            src="https://images.unsplash.com/photo-1467453678174-768ec283a940?q=80&w=1200&auto=format&fit=crop"
-            alt="Fresh salad bowl close-up"
+            src="https://images.unsplash.com/photo-1512058564366-18510be2db19?q=80&w=1200&auto=format&fit=crop"
+            alt="Vegan salad dish with colorful seasonal ingredients"
           />
         </div>
       </section>
 
       <section id="faq" class="faq reveal-alt">
-        <h2>What people ask most</h2>
+        <h2 data-i18n="faq.title">What people ask most</h2>
         <details>
-          <summary>Do I need to be fully plant-based?</summary>
-          <p>No. We use a flexible plant-forward approach tailored to your goals and preferences.</p>
+          <summary data-i18n="faq.q1">Do I need to be fully plant-based?</summary>
+          <p data-i18n="faq.a1">No. We use a flexible plant-forward approach tailored to your goals and preferences.</p>
         </details>
         <details>
-          <summary>How much time does meal prep take?</summary>
-          <p>Most clients use 60–90 minutes weekly with our prep templates.</p>
+          <summary data-i18n="faq.q2">How much time does meal prep take?</summary>
+          <p data-i18n="faq.a2">Most clients use 60–90 minutes weekly with our prep templates.</p>
         </details>
         <details>
-          <summary>Can this fit a busy work week?</summary>
-          <p>Yes — the program is built around realistic routines and fast weekday options.</p>
+          <summary data-i18n="faq.q3">Can this fit a busy work week?</summary>
+          <p data-i18n="faq.a3">Yes — the program is built around realistic routines and fast weekday options.</p>
         </details>
       </section>
 
       <section id="cta" class="cta reveal-alt">
-        <h2>Ready to feel better in your body?</h2>
-        <p>Book your free discovery call to build habits that support lasting health.</p>
-        <a class="btn btn-accent" href="mailto:hello@nutristika.com">Book Your Free Discovery Call</a>
+        <h2 data-i18n="cta.title">Ready to feel better in your body?</h2>
+        <p data-i18n="cta.text">Book your free discovery call to build habits that support lasting health.</p>
+        <a class="btn btn-accent" href="mailto:hello@nutristika.com" data-i18n="cta.button">Book Your Free Discovery Call</a>
       </section>
 
       <section id="inquiry" class="inquiry reveal-alt">
@@ -271,13 +289,13 @@
           <div class="inquiry-media">
             <img
               class="leaf-image"
-              src="https://images.unsplash.com/photo-1484723091739-30a097e8f929?q=80&w=1200&auto=format&fit=crop"
+              src="images/Jasmina-2.jpeg"
               alt="Vegan breakfast toast with fruit"
             />
           </div>
           <div class="inquiry-content">
-            <h2>Coaching Inquiry Form</h2>
-            <p>Share your goals, and we’ll follow up with thoughtful next steps tailored to your lifestyle.</p>
+            <h2 data-i18n="form.title">Coaching Inquiry Form</h2>
+            <p data-i18n="form.subtitle">Share your goals, and we’ll follow up with thoughtful next steps tailored to your lifestyle.</p>
             <form
               class="inquiry-form"
               action="mailto:hello@nutristika.com"
@@ -286,50 +304,47 @@
             >
               <div class="inquiry-grid">
                 <label>
-                  Full Name
+                  <span data-i18n="form.name">Full Name</span>
                   <input type="text" name="Full Name" required />
                 </label>
                 <label>
-                  Email Address
+                  <span data-i18n="form.email">Email Address</span>
                   <input type="email" name="Email" required />
                 </label>
                 <label>
-                  Phone (optional)
+                  <span data-i18n="form.phone">Phone (optional)</span>
                   <input type="tel" name="Phone" />
                 </label>
                 <label>
-                  Preferred Program
+                  <span data-i18n="form.program">Preferred Program</span>
                   <select name="Preferred Program" required>
-                    <option value="" selected disabled>Select one</option>
-                    <option value="Quick Reset">Quick Reset</option>
-                    <option value="Signature 8-Week Coaching">Signature 8-Week Coaching</option>
-                    <option value="Performance Nutrition">Performance Nutrition</option>
+                    <option value="" selected disabled data-i18n="form.select">Select one</option>
+                    <option value="General Information" data-i18n="form.opt.info">General Information</option>
+                    <option value="Quick Reset" data-i18n="form.opt.reset">Quick Reset</option>
+                    <option value="Signature 8-Week Coaching" data-i18n="form.opt.signature">Signature 8-Week Coaching</option>
+                    <option value="Performance Nutrition" data-i18n="form.opt.performance">Performance Nutrition</option>
                   </select>
                 </label>
               </div>
               <label>
-                What would you like support with?
+                <span data-i18n="form.support">What would you like support with?</span>
                 <textarea
                   name="Goals"
                   rows="5"
                   placeholder="Energy, inflammation, meal planning, weight goals, schedule challenges..."
+                  data-i18n-placeholder="form.placeholder"
                   required
                 ></textarea>
               </label>
-              <button class="btn btn-accent" type="submit">Send Inquiry</button>
+              <button class="btn btn-accent" type="submit" data-i18n="form.button">Send Inquiry</button>
             </form>
           </div>
         </div>
       </section>
     </main>
 
-    <a id="fab-cta" class="fab-cta" href="#cta">
-      <span class="pulse"></span>
-      Book a Call
-    </a>
-
     <footer class="footer">
-      <p>&copy; 2026 Nutristika</p>
+      <p data-i18n="footer.copy">&copy; 2026 Nutristika</p>
     </footer>
 
     <script src="script-alt.js" defer></script>

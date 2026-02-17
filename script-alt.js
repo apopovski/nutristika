@@ -12,6 +12,205 @@
   const mobileMenu = document.getElementById("mobile-menu");
   const mobileMenuLinks = mobileMenu?.querySelectorAll("a") || [];
 
+  /* ----------------------------------------------------------
+     0b. Simple i18n (EN / DE)
+     ---------------------------------------------------------- */
+  const i18nDict = {
+    en: {
+      "nav.story": "Story",
+      "nav.programs": "Programs",
+      "nav.benefits": "Benefits",
+      "nav.faq": "FAQ",
+      "nav.contact": "Contact",
+      "lang.label": "Language",
+      "lang.en": "English",
+      "lang.de": "Deutsch",
+      "header.cta": "BOOK A FREE CALL",
+      "hero.word1": "SIMPLE",
+      "hero.word2": "HABITS.",
+      "hero.word3": "LASTING",
+      "hero.word4": "Health.",
+      "hero.person.title": "Registered Dietitian Nutritionist",
+      "hero.eyebrow": "Registered Dietitian Nutritionist",
+      "hero.cta": "Explore Programs",
+      "story.title": "We’re more than a meal plan.",
+      "story.body": "I support adults who want to feel better in their bodies without restrictive diets or quick fixes. As a registered dietitian, I combine evidence-based nutrition, plant-forward culinary guidance, and behavior coaching to help you create habits that truly last.",
+      "story.goal": "My goal is simple: empower you to take control of your health with clarity and confidence.",
+      "story.card1.title": "Easy",
+      "story.card1.text": "Simple weekly systems that work in real life.",
+      "story.card2.title": "Tasty",
+      "story.card2.text": "Balanced food that feels satisfying, not restrictive.",
+      "story.card3.title": "Quick",
+      "story.card3.text": "Fast, practical actions you can use right away on busy days.",
+      "story.card4.title": "Sustainable",
+      "story.card4.text": "Simple habits designed to last long-term, not just for a few weeks.",
+      "services.title": "Services designed for lasting change",
+      "services.card1.badge": "Personalized",
+      "services.card1.title": "1:1 Nutrition Coaching",
+      "services.card1.text": "Personalized guidance focused on sustainable change.",
+      "services.card1.cta": "Learn more →",
+      "services.card2.badge": "Most Popular",
+      "services.card2.title": "Signature Coaching Program",
+      "services.card2.text": "Step-by-step support for lasting health transformation.",
+      "services.card2.cta": "Discover more →",
+      "services.card3.badge": "Practical",
+      "services.card3.title": "Meal Planning & Kitchen Skills",
+      "services.card3.text": "Simple systems to make healthy eating easier.",
+      "services.card3.cta": "Get started →",
+      "quotes.title": "Don’t just trust us — trust results.",
+      "quotes.q1": "“I finally stopped starting over every Monday. The structure is simple and it works.”",
+      "quotes.c1": "— Miriam, Project Cordinatior",
+      "quotes.q2": "“Energy is up, inflammation is down, and meal prep takes half the time now.”",
+      "quotes.c2": "— Aleksandar, Designer",
+      "faq.title": "What people ask most",
+      "faq.q1": "Do I need to be fully plant-based?",
+      "faq.a1": "No. We use a flexible plant-forward approach tailored to your goals and preferences.",
+      "faq.q2": "How much time does meal prep take?",
+      "faq.a2": "Most clients use 60–90 minutes weekly with our prep templates.",
+      "faq.q3": "Can this fit a busy work week?",
+      "faq.a3": "Yes — the program is built around realistic routines and fast weekday options.",
+      "cta.title": "Ready to feel better in your body?",
+      "cta.text": "Book your free discovery call to build habits that support lasting health.",
+      "cta.button": "Book Your Free Discovery Call",
+      "form.title": "Coaching Inquiry Form",
+      "form.subtitle": "Share your goals, and we’ll follow up with thoughtful next steps tailored to your lifestyle.",
+      "form.name": "Full Name",
+      "form.email": "Email Address",
+      "form.phone": "Phone (optional)",
+      "form.program": "Preferred Program",
+      "form.select": "Select one",
+      "form.opt.info": "General Information",
+      "form.opt.reset": "Quick Reset",
+      "form.opt.signature": "Signature 8-Week Coaching",
+      "form.opt.performance": "Performance Nutrition",
+      "form.support": "What would you like support with?",
+      "form.placeholder": "Energy, inflammation, meal planning, weight goals, schedule challenges...",
+      "form.button": "Send Inquiry",
+      "fab.cta": "Book a Call",
+      "footer.copy": "© 2026 Nutristika"
+    },
+    de: {
+      "nav.story": "Überblick",
+      "nav.programs": "Programme",
+      "nav.benefits": "Vorteile",
+      "nav.faq": "FAQ",
+      "nav.contact": "Kontakt",
+      "lang.label": "Sprache",
+      "lang.en": "English",
+      "lang.de": "Deutsch",
+      "header.cta": "KOSTENLOSES ERSTGESPRÄCH BUCHEN",
+      "hero.word1": "EINFACHE",
+      "hero.word2": "GEWOHNHEITEN.",
+      "hero.word3": "NACHHALTIGE",
+      "hero.word4": "Gesundheit.",
+      "hero.person.title": "Registrierte Ernährungsberaterin",
+      "hero.eyebrow": "Registrierte Ernährungsberaterin",
+      "hero.cta": "Programme entdecken",
+      "story.title": "Wir sind mehr als nur ein Ernährungsplan.",
+      "story.body": "Ich unterstütze Erwachsene, die sich in ihrem Körper besser fühlen möchten – ohne restriktive Diäten oder schnelle Lösungen. Als registrierte Ernährungsberaterin kombiniere ich evidenzbasierte Ernährung, pflanzenbetonte Küchenpraxis und Verhaltenscoaching, damit Gewohnheiten wirklich langfristig halten.",
+      "story.goal": "Mein Ziel ist klar: Sie dabei zu unterstützen, Ihre Gesundheit mit Klarheit und Selbstvertrauen in die Hand zu nehmen.",
+      "story.card1.title": "Einfach",
+      "story.card1.text": "Einfache Wochenroutinen, die im echten Alltag funktionieren.",
+      "story.card2.title": "Lecker",
+      "story.card2.text": "Ausgewogene Ernährung, die sättigt – ohne Verzicht.",
+      "story.card3.title": "Schnell",
+      "story.card3.text": "Praktische Schritte, die Sie sofort in stressigen Tagen umsetzen können.",
+      "story.card4.title": "Nachhaltig",
+      "story.card4.text": "Gewohnheiten, die langfristig bleiben – nicht nur für ein paar Wochen.",
+      "services.title": "Leistungen für nachhaltige Veränderung",
+      "services.card1.badge": "Individuell",
+      "services.card1.title": "1:1 Ernährungscoaching",
+      "services.card1.text": "Individuelle Begleitung mit Fokus auf nachhaltige Veränderung.",
+      "services.card1.cta": "Mehr erfahren →",
+      "services.card2.badge": "Am beliebtesten",
+      "services.card2.title": "Signature-Coaching-Programm",
+      "services.card2.text": "Schritt-für-Schritt-Begleitung für langfristige Gesundheit.",
+      "services.card2.cta": "Mehr entdecken →",
+      "services.card3.badge": "Praxisnah",
+      "services.card3.title": "Meal Planning & Küchenkompetenz",
+      "services.card3.text": "Einfache Systeme, die gesundes Essen leichter machen.",
+      "services.card3.cta": "Jetzt starten →",
+      "quotes.title": "Verlassen Sie sich nicht nur auf uns — vertrauen Sie den Ergebnissen.",
+      "quotes.q1": "„Ich habe endlich aufgehört, jeden Montag wieder von vorne anzufangen. Die Struktur ist einfach und funktioniert.“",
+      "quotes.c1": "— Miriam, Projektkoordinatorin",
+      "quotes.q2": "„Mehr Energie, weniger Entzündung, und Meal Prep dauert nur noch halb so lange.“",
+      "quotes.c2": "— Aleksandar, Designer",
+      "faq.title": "Häufig gestellte Fragen",
+      "faq.q1": "Muss ich komplett pflanzenbasiert essen?",
+      "faq.a1": "Nein. Wir arbeiten mit einem flexiblen, pflanzenbetonten Ansatz – passend zu Ihren Zielen und Vorlieben.",
+      "faq.q2": "Wie viel Zeit braucht Meal Prep?",
+      "faq.a2": "Die meisten Kund:innen brauchen mit unseren Vorlagen 60–90 Minuten pro Woche.",
+      "faq.q3": "Passt das in einen vollen Arbeitsalltag?",
+      "faq.a3": "Ja — das Programm ist auf realistische Routinen und schnelle Optionen unter der Woche ausgelegt.",
+      "cta.title": "Bereit, sich in Ihrem Körper besser zu fühlen?",
+      "cta.text": "Buchen Sie Ihr kostenloses Erstgespräch und bauen Sie Gewohnheiten auf, die Ihre Gesundheit langfristig stärken.",
+      "cta.button": "Kostenloses Erstgespräch buchen",
+      "form.title": "Anfrageformular für Coaching",
+      "form.subtitle": "Teilen Sie Ihre Ziele mit — wir melden uns mit passenden nächsten Schritten für Ihren Alltag.",
+      "form.name": "Vollständiger Name",
+      "form.email": "E-Mail-Adresse",
+      "form.phone": "Telefon (optional)",
+      "form.program": "Gewünschtes Programm",
+      "form.select": "Bitte auswählen",
+      "form.opt.info": "Allgemeine Informationen",
+      "form.opt.reset": "Quick Reset",
+      "form.opt.signature": "Signature 8-Week Coaching",
+      "form.opt.performance": "Performance Nutrition",
+      "form.support": "Wobei wünschen Sie sich Unterstützung?",
+      "form.placeholder": "Energie, Entzündungen, Meal Planning, Gewichtsziele, Herausforderungen im Alltag...",
+      "form.button": "Anfrage senden",
+      "fab.cta": "Gespräch buchen",
+      "footer.copy": "© 2026 Nutristika"
+    }
+  };
+
+  const languageButtons = document.querySelectorAll(".lang-btn[data-lang]");
+  const detectPreferredLanguage = () => {
+    const browserLanguages = [
+      ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+      navigator.language,
+      navigator.userLanguage
+    ].filter(Boolean);
+
+    const normalized = browserLanguages.map((lang) => String(lang).toLowerCase());
+    if (normalized.some((lang) => lang.startsWith("de"))) return "de";
+    return "en";
+  };
+
+  const applyLanguage = (lang) => {
+    const selected = i18nDict[lang] ? lang : "en";
+    const dict = i18nDict[selected];
+
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (key && dict[key]) el.textContent = dict[key];
+    });
+
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-placeholder");
+      if (key && dict[key]) el.setAttribute("placeholder", dict[key]);
+    });
+
+    document.documentElement.setAttribute("lang", selected === "de" ? "de" : "en");
+    localStorage.setItem("site-language", selected);
+    languageButtons.forEach((button) => {
+      const isActive = button.dataset.lang === selected;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  };
+
+  const initialLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+  applyLanguage(initialLang);
+
+  if (languageButtons.length) {
+    languageButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        applyLanguage(button.dataset.lang || "en");
+      });
+    });
+  }
+
   const setMenuState = (open) => {
     if (!menuToggle || !mobileMenu) return;
     menuToggle.setAttribute("aria-expanded", String(open));
@@ -77,21 +276,6 @@
     { threshold: 0.1 }
   );
   staggerContainers.forEach((el) => staggerObs.observe(el));
-
-  /* ----------------------------------------------------------
-     3. Floating CTA — show after scrolling past hero
-     ---------------------------------------------------------- */
-  const fab = document.getElementById("fab-cta");
-  const hero = document.querySelector(".hero");
-  if (fab && hero) {
-    const fabObs = new IntersectionObserver(
-      ([e]) => {
-        fab.classList.toggle("show", !e.isIntersecting);
-      },
-      { threshold: 0 }
-    );
-    fabObs.observe(hero);
-  }
 
   /* ----------------------------------------------------------
      4. Ticker marquee — clone text for seamless infinite loop
