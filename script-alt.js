@@ -165,6 +165,23 @@
   };
 
   const languageButtons = document.querySelectorAll(".lang-btn[data-lang]");
+  const adminApiBaseFromHtml = document.documentElement.getAttribute("data-admin-api-base") || "";
+  const adminApiBaseFromWindow = typeof window.NUTRISTIKA_ADMIN_API_BASE === "string"
+    ? window.NUTRISTIKA_ADMIN_API_BASE
+    : "";
+
+  const apiBases = [...new Set([
+    adminApiBaseFromWindow,
+    adminApiBaseFromHtml,
+    "https://nutristika-admin.vercel.app",
+    ""
+  ].map((value) => String(value || "").trim()))];
+
+  let siteContentOverrides = {
+    textByKey: {},
+    imageByKey: {}
+  };
+
   const fallbackHomepageContent = {
     title: i18nDict.en["story.title"],
     description: i18nDict.en["story.body"]
@@ -182,18 +199,87 @@
     return "en";
   };
 
+  const getTextOverride = (key, lang) => {
+    const byKey = siteContentOverrides?.textByKey?.[key];
+    if (!byKey) return null;
+
+    const localized = typeof byKey?.[lang] === "string" ? byKey[lang].trim() : "";
+    if (localized) return localized;
+
+    const universal = typeof byKey?.all === "string" ? byKey.all.trim() : "";
+    if (universal) return universal;
+
+    return null;
+  };
+
+  const applyImageOverrides = () => {
+    const imageMap = siteContentOverrides?.imageByKey || {};
+    document.querySelectorAll("[data-image-key]").forEach((el) => {
+      const key = el.getAttribute("data-image-key");
+      const overrideSrc = key ? imageMap[key] : "";
+
+      if (typeof overrideSrc === "string" && overrideSrc.trim()) {
+        el.setAttribute("src", overrideSrc.trim());
+      }
+    });
+  };
+
+  const fetchFirstJson = async (path) => {
+    for (const base of apiBases) {
+      const prefix = base.replace(/\/$/, "");
+      const url = `${prefix}${path}`;
+
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Accept: "application/json"
+          },
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          continue;
+        }
+
+        const data = await response.json();
+        return data;
+      } catch {
+        // Keep trying the next candidate base URL.
+      }
+    }
+
+    return null;
+  };
+
   const applyLanguage = (lang) => {
     const selected = i18nDict[lang] ? lang : "en";
     const dict = i18nDict[selected];
 
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      if (key && dict[key]) el.textContent = dict[key];
+      if (!key) return;
+
+      const override = getTextOverride(key, selected);
+      if (override) {
+        el.textContent = override;
+        return;
+      }
+
+      if (dict[key]) el.textContent = dict[key];
     });
 
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-i18n-placeholder");
-      if (key && dict[key]) el.setAttribute("placeholder", dict[key]);
+      if (!key) return;
+
+      const override = getTextOverride(key, selected);
+      if (override) {
+        el.setAttribute("placeholder", override);
+        return;
+      }
+
+      if (dict[key]) el.setAttribute("placeholder", dict[key]);
     });
 
     document.documentElement.setAttribute("lang", selected === "de" ? "de" : "en");
@@ -207,6 +293,201 @@
 
   const initialLang = localStorage.getItem("site-language") || detectPreferredLanguage();
   applyLanguage(initialLang);
+
+  /* ----------------------------------------------------------
+     0c. Live key inspector (for fast content mapping)
+     ---------------------------------------------------------- */
+  const INSPECTOR_STORAGE_KEY = "nutristika-key-inspector";
+  const params = new URLSearchParams(window.location.search);
+  const inspectorParam = params.get("inspector");
+
+  if (inspectorParam === "1") {
+    localStorage.setItem(INSPECTOR_STORAGE_KEY, "true");
+  }
+
+  if (inspectorParam === "0") {
+    localStorage.setItem(INSPECTOR_STORAGE_KEY, "false");
+  }
+
+  const shouldShowInspectorUi = inspectorParam !== null || localStorage.getItem(INSPECTOR_STORAGE_KEY) === "true";
+  let isInspectorEnabled = localStorage.getItem(INSPECTOR_STORAGE_KEY) === "true";
+  let highlightedNode = null;
+
+  const getInspectorNode = (target) => {
+    if (!(target instanceof Element)) return null;
+    return target.closest("[data-i18n], [data-i18n-placeholder], [data-image-key]");
+  };
+
+  const getInspectorDetails = (node) => {
+    const i18nKey = node.getAttribute("data-i18n");
+    const placeholderKey = node.getAttribute("data-i18n-placeholder");
+    const imageKey = node.getAttribute("data-image-key");
+
+    if (imageKey) {
+      return {
+        type: "image",
+        key: imageKey,
+        value: (node.getAttribute("src") || "").trim()
+      };
+    }
+
+    if (placeholderKey) {
+      return {
+        type: "placeholder",
+        key: placeholderKey,
+        value: (node.getAttribute("placeholder") || "").trim()
+      };
+    }
+
+    return {
+      type: "text",
+      key: i18nKey || "",
+      value: (node.textContent || "").trim()
+    };
+  };
+
+  const inspectorRoot = document.createElement("div");
+  inspectorRoot.className = "key-inspector";
+  inspectorRoot.innerHTML = `
+    <button type="button" class="key-inspector__toggle" aria-pressed="false">Inspector: Off</button>
+    <p class="key-inspector__hint">Tip: click any highlighted text/image to copy its key.</p>
+    <p class="key-inspector__status" role="status" aria-live="polite">Inspector idle</p>
+  `;
+
+  const inspectorToggleButton = inspectorRoot.querySelector(".key-inspector__toggle");
+  const inspectorStatus = inspectorRoot.querySelector(".key-inspector__status");
+
+  const setInspectorStatus = (message, tone = "info") => {
+    if (!inspectorStatus) return;
+    inspectorStatus.textContent = message;
+    inspectorStatus.setAttribute("data-tone", tone);
+  };
+
+  const setInspectorEnabled = (enabled) => {
+    isInspectorEnabled = Boolean(enabled);
+    localStorage.setItem(INSPECTOR_STORAGE_KEY, isInspectorEnabled ? "true" : "false");
+    document.body.classList.toggle("inspector-enabled", isInspectorEnabled);
+
+    if (!isInspectorEnabled && highlightedNode) {
+      highlightedNode.classList.remove("key-inspector__focus");
+      highlightedNode = null;
+    }
+
+    if (inspectorToggleButton instanceof HTMLButtonElement) {
+      inspectorToggleButton.setAttribute("aria-pressed", String(isInspectorEnabled));
+      inspectorToggleButton.textContent = `Inspector: ${isInspectorEnabled ? "On" : "Off"}`;
+    }
+
+    setInspectorStatus(
+      isInspectorEnabled
+        ? "Inspector active — hover and click keyed elements."
+        : "Inspector off",
+      isInspectorEnabled ? "success" : "info"
+    );
+  };
+
+  if (shouldShowInspectorUi) {
+    document.body.appendChild(inspectorRoot);
+    if (inspectorToggleButton instanceof HTMLButtonElement) {
+      inspectorToggleButton.addEventListener("click", () => {
+        setInspectorEnabled(!isInspectorEnabled);
+      });
+    }
+  }
+
+  setInspectorEnabled(isInspectorEnabled);
+
+  const copyInspectorPayload = async (details) => {
+    const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+    const payload = JSON.stringify(
+      {
+        key: details.key,
+        type: details.type,
+        language: details.type === "image" ? "all" : activeLang,
+        value: details.value
+      },
+      null,
+      2
+    );
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      return true;
+    } catch {
+      try {
+        const temp = document.createElement("textarea");
+        temp.value = payload;
+        temp.setAttribute("readonly", "");
+        temp.style.position = "fixed";
+        temp.style.opacity = "0";
+        document.body.appendChild(temp);
+        temp.focus();
+        temp.select();
+        const copied = document.execCommand("copy");
+        temp.remove();
+        return copied;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  document.addEventListener("mouseover", (event) => {
+    if (!isInspectorEnabled) return;
+    if (inspectorRoot.contains(event.target)) return;
+
+    const node = getInspectorNode(event.target);
+
+    if (highlightedNode && highlightedNode !== node) {
+      highlightedNode.classList.remove("key-inspector__focus");
+    }
+
+    if (node) {
+      node.classList.add("key-inspector__focus");
+      highlightedNode = node;
+      const details = getInspectorDetails(node);
+      setInspectorStatus(`Hover: ${details.type} → ${details.key || "(missing key)"}`);
+      return;
+    }
+
+    highlightedNode = null;
+    setInspectorStatus("Inspector active — hover and click keyed elements.");
+  });
+
+  document.addEventListener("click", async (event) => {
+    if (!isInspectorEnabled) return;
+    if (inspectorRoot.contains(event.target)) return;
+
+    const node = getInspectorNode(event.target);
+    if (!node) return;
+
+    const details = getInspectorDetails(node);
+    if (!details.key) {
+      setInspectorStatus("Selected element has no key attribute.", "error");
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const copied = await copyInspectorPayload(details);
+    if (copied) {
+      setInspectorStatus(`Copied ${details.type} key: ${details.key}`, "success");
+      return;
+    }
+
+    setInspectorStatus("Could not copy to clipboard. Please try again.", "error");
+  }, true);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key.toLowerCase() === "i" && event.shiftKey && event.altKey) {
+      event.preventDefault();
+      if (!document.body.contains(inspectorRoot)) {
+        document.body.appendChild(inspectorRoot);
+      }
+      setInspectorEnabled(!isInspectorEnabled);
+    }
+  });
 
   const applyHomepageContent = (content) => {
     const title = typeof content?.title === "string" && content.title.trim()
@@ -223,28 +504,40 @@
     applyLanguage(activeLang);
   };
 
+  const loadSiteContentOverrides = async () => {
+    const data = await fetchFirstJson("/api/site-content");
+
+    if (!data || typeof data !== "object") {
+      siteContentOverrides = { textByKey: {}, imageByKey: {} };
+      applyImageOverrides();
+      return;
+    }
+
+    siteContentOverrides = {
+      textByKey: typeof data.textByKey === "object" && data.textByKey ? data.textByKey : {},
+      imageByKey: typeof data.imageByKey === "object" && data.imageByKey ? data.imageByKey : {}
+    };
+
+    applyImageOverrides();
+    const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+    applyLanguage(activeLang);
+  };
+
   const loadHomepageContent = async () => {
     try {
-      const response = await fetch("/api/homepage-content", {
-        method: "GET",
-        headers: {
-          Accept: "application/json"
-        },
-        cache: "no-store"
-      });
-
-      if (!response.ok) {
+      const data = await fetchFirstJson("/api/homepage-content");
+      if (!data) {
         applyHomepageContent(fallbackHomepageContent);
         return;
       }
 
-      const data = await response.json();
       applyHomepageContent(data);
     } catch {
       applyHomepageContent(fallbackHomepageContent);
     }
   };
 
+  void loadSiteContentOverrides();
   void loadHomepageContent();
 
   if (languageButtons.length) {

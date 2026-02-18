@@ -12,15 +12,34 @@ const fallbackHomepageContent = {
     "I support adults who want to feel better in their bodies without restrictive diets or quick fixes. As a registered dietitian, I combine evidence-based nutrition, plant-forward culinary guidance, and behavior coaching to help you create habits that truly last."
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization"
+};
+
+const jsonResponse = (payload: object) =>
+  NextResponse.json(payload, {
+    status: 200,
+    headers: {
+      "Cache-Control": "no-store",
+      ...corsHeaders
+    }
+  });
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders
+  });
+}
+
 export async function GET() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json(fallbackHomepageContent, {
-      status: 200,
-      headers: { "Cache-Control": "no-store" }
-    });
+    return jsonResponse(fallbackHomepageContent);
   }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
@@ -38,20 +57,11 @@ export async function GET() {
     .maybeSingle<HomepageContentRow>();
 
   if (error || !data) {
-    return NextResponse.json(fallbackHomepageContent, {
-      status: 200,
-      headers: { "Cache-Control": "no-store" }
-    });
+    return jsonResponse(fallbackHomepageContent);
   }
 
-  return NextResponse.json(
-    {
-      title: data.title?.trim() || fallbackHomepageContent.title,
-      description: data.description?.trim() || fallbackHomepageContent.description
-    },
-    {
-      status: 200,
-      headers: { "Cache-Control": "no-store" }
-    }
-  );
+  return jsonResponse({
+    title: data.title?.trim() || fallbackHomepageContent.title,
+    description: data.description?.trim() || fallbackHomepageContent.description
+  });
 }

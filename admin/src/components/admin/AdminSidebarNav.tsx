@@ -18,6 +18,12 @@ const navItems: NavItem[] = [
     icon: "📊"
   },
   {
+    href: "/admin/site-editor",
+    title: "Site Editor",
+    description: "Text + images",
+    icon: "🧩"
+  },
+  {
     href: "/admin/homepage-editor",
     title: "Edit Homepage",
     description: "Update main content",
