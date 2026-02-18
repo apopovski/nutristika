@@ -29,6 +29,16 @@ execute function public.set_site_content_updated_at();
 
 alter table public.site_content_overrides enable row level security;
 
+create or replace function public.has_admin_claim()
+returns boolean
+language sql
+stable
+as $$
+  select
+    coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') = 'admin'
+    or coalesce((auth.jwt() -> 'app_metadata' -> 'roles') ? 'admin', false);
+$$;
+
 -- Allow anyone to read override content (public site fetch).
 drop policy if exists "Public read site_content_overrides" on public.site_content_overrides;
 create policy "Public read site_content_overrides"
@@ -42,5 +52,5 @@ create policy "Admin write site_content_overrides"
 on public.site_content_overrides
 for all
 to authenticated
-using (coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') = 'admin')
-with check (coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') = 'admin');
+using (public.has_admin_claim())
+with check (public.has_admin_claim());

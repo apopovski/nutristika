@@ -80,25 +80,52 @@ export default function SiteEditorPage() {
   const [newType, setNewType] = useState<ContentType>("text");
   const [newLanguage, setNewLanguage] = useState<ContentLanguage>("all");
 
+  const callAdminApi = async (method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>) => {
+    const supabase = getSupabaseClient();
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      return {
+        ok: false,
+        message: "Your session has expired. Please sign out and sign in again."
+      };
+    }
+
+    const response = await fetch("/api/admin/site-content", {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: "no-store"
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload,
+      message: typeof payload?.message === "string" ? payload.message : "Request failed."
+    };
+  };
+
   const loadRows = async () => {
     setIsLoading(true);
     setBanner(null);
 
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from("site_content_overrides")
-      .select("id,key,value,content_type,language,updated_at")
-      .order("key", { ascending: true })
-      .returns<SiteOverrideRow[]>();
-
-    if (error) {
-      setBanner({ kind: "error", text: `Unable to load content: ${error.message}` });
+    const result = await callAdminApi("GET");
+    if (!result.ok) {
+      setBanner({ kind: "error", text: `Unable to load content: ${result.message}` });
       setRows([]);
       setIsLoading(false);
       return;
     }
 
-    setRows(data || []);
+    const items = Array.isArray(result.payload?.items) ? (result.payload.items as SiteOverrideRow[]) : [];
+    setRows(items);
     setIsLoading(false);
   };
 
@@ -131,16 +158,15 @@ export default function SiteEditorPage() {
     setIsSaving(true);
     setBanner(null);
 
-    const supabase = getSupabaseClient();
-    const { error } = await supabase.from("site_content_overrides").insert({
+    const result = await callAdminApi("POST", {
       key,
       value,
       content_type: newType,
       language: newType === "image" ? "all" : newLanguage
     });
 
-    if (error) {
-      setBanner({ kind: "error", text: `Create failed: ${error.message}` });
+    if (!result.ok) {
+      setBanner({ kind: "error", text: `Create failed: ${result.message}` });
       setIsSaving(false);
       return;
     }
@@ -176,19 +202,16 @@ export default function SiteEditorPage() {
     setIsSaving(true);
     setBanner(null);
 
-    const supabase = getSupabaseClient();
-    const { error } = await supabase
-      .from("site_content_overrides")
-      .update({
-        key,
-        value,
-        content_type: row.content_type,
-        language: row.content_type === "image" ? "all" : row.language || "all"
-      })
-      .eq("id", row.id);
+    const result = await callAdminApi("PATCH", {
+      id: row.id,
+      key,
+      value,
+      content_type: row.content_type,
+      language: row.content_type === "image" ? "all" : row.language || "all"
+    });
 
-    if (error) {
-      setBanner({ kind: "error", text: `Save failed: ${error.message}` });
+    if (!result.ok) {
+      setBanner({ kind: "error", text: `Save failed: ${result.message}` });
       setIsSaving(false);
       return;
     }
@@ -204,11 +227,10 @@ export default function SiteEditorPage() {
     setIsSaving(true);
     setBanner(null);
 
-    const supabase = getSupabaseClient();
-    const { error } = await supabase.from("site_content_overrides").delete().eq("id", row.id);
+    const result = await callAdminApi("DELETE", { id: row.id });
 
-    if (error) {
-      setBanner({ kind: "error", text: `Delete failed: ${error.message}` });
+    if (!result.ok) {
+      setBanner({ kind: "error", text: `Delete failed: ${result.message}` });
       setIsSaving(false);
       return;
     }
