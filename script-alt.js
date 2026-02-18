@@ -165,6 +165,11 @@
   };
 
   const languageButtons = document.querySelectorAll(".lang-btn[data-lang]");
+  const fallbackHomepageContent = {
+    title: i18nDict.en["story.title"],
+    description: i18nDict.en["story.body"]
+  };
+
   const detectPreferredLanguage = () => {
     const browserLanguages = [
       ...(Array.isArray(navigator.languages) ? navigator.languages : []),
@@ -202,6 +207,45 @@
 
   const initialLang = localStorage.getItem("site-language") || detectPreferredLanguage();
   applyLanguage(initialLang);
+
+  const applyHomepageContent = (content) => {
+    const title = typeof content?.title === "string" && content.title.trim()
+      ? content.title.trim()
+      : fallbackHomepageContent.title;
+    const description = typeof content?.description === "string" && content.description.trim()
+      ? content.description.trim()
+      : fallbackHomepageContent.description;
+
+    i18nDict.en["story.title"] = title;
+    i18nDict.en["story.body"] = description;
+
+    const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+    applyLanguage(activeLang);
+  };
+
+  const loadHomepageContent = async () => {
+    try {
+      const response = await fetch("/api/homepage-content", {
+        method: "GET",
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        applyHomepageContent(fallbackHomepageContent);
+        return;
+      }
+
+      const data = await response.json();
+      applyHomepageContent(data);
+    } catch {
+      applyHomepageContent(fallbackHomepageContent);
+    }
+  };
+
+  void loadHomepageContent();
 
   if (languageButtons.length) {
     languageButtons.forEach((button) => {
