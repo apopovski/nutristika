@@ -154,7 +154,7 @@ export default function HomepageEditorPage() {
 
       {banner ? (
         <div
-          className={`mt-5 rounded-xl border px-4 py-3 text-sm ${
+          className={`mt-5 rounded-2xl border px-4 py-3 text-sm shadow-sm ${
             banner.kind === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-800"
               : banner.kind === "error"
@@ -168,7 +168,10 @@ export default function HomepageEditorPage() {
       ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <form onSubmit={handleSave} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <form
+          onSubmit={handleSave}
+          className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)]"
+        >
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <label htmlFor="homepage-title" className="block text-sm font-medium text-slate-700">
@@ -211,7 +214,7 @@ export default function HomepageEditorPage() {
             <button
               type="submit"
               disabled={isLoading || isSaving || !hasUnsavedChanges}
-              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? "Loading..." : isSaving ? "Saving..." : "Save changes"}
             </button>
@@ -227,9 +230,9 @@ export default function HomepageEditorPage() {
           </div>
         </form>
 
-        <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+        <aside className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Live preview</p>
-          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
             <h3 className="text-xl font-semibold leading-tight text-slate-900">{titlePreview}</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">{descriptionPreview}</p>
           </div>

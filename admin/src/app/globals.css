@@ -9,3 +9,11 @@
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+::selection {
+  @apply bg-emerald-200 text-slate-900;
+}
+
+.glass-panel {
+  @apply border border-white/50 bg-white/70 backdrop-blur;
+}
