@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 import Link from "next/link";
@@ -12,6 +12,19 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showResetToast, setShowResetToast] = useState(false);
+
+  useEffect(() => {
+    const didReset = new URLSearchParams(window.location.search).get("reset") === "success";
+    if (!didReset) return;
+
+    setShowResetToast(true);
+    const timeoutId = window.setTimeout(() => {
+      setShowResetToast(false);
+    }, 3500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -52,6 +65,12 @@ export default function AdminLoginPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Admin login</h1>
         <p className="mt-2 text-sm text-slate-600">Sign in to access the Nutristika admin area.</p>
         <p className="mt-1 text-xs text-slate-500">Only authorized team members should use this page.</p>
+
+        {showResetToast ? (
+          <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">
+            Password updated, please sign in.
+          </p>
+        ) : null}
 
         <form className="mt-6 space-y-4" onSubmit={handleLogin}>
           <label className="block">

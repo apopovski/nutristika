@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
 
       setBanner({ kind: "success", text: "Password updated. Redirecting to sign in..." });
       window.setTimeout(() => {
-        router.replace("/admin/login");
+        router.replace("/admin/login?reset=success");
         router.refresh();
       }, 1200);
     } catch {
