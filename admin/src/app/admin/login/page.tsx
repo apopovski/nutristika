@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import Link from "next/link";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -91,6 +92,11 @@ export default function AdminLoginPage() {
           >
             {isLoading ? "Signing in..." : "Sign in"}
           </button>
+          <div className="text-right">
+            <Link href="/admin/forgot-password" className="text-xs font-medium text-slate-600 underline underline-offset-2">
+              Forgot password?
+            </Link>
+          </div>
         </form>
       </section>
     </main>

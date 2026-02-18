@@ -51,10 +51,17 @@ export async function middleware(request: NextRequest) {
     data: { user }
   } = await supabase.auth.getUser();
 
+  const authPublicRoutes = new Set([
+    "/admin/login",
+    "/admin/forgot-password",
+    "/admin/reset-password"
+  ]);
+
   const isLoginRoute = request.nextUrl.pathname === "/admin/login";
+  const isAuthPublicRoute = authPublicRoutes.has(request.nextUrl.pathname);
   const isAccessDeniedRoute = request.nextUrl.pathname === "/admin/access-denied";
 
-  if (!user && !isLoginRoute) {
+  if (!user && !isAuthPublicRoute) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/admin/login";
     loginUrl.search = "";
@@ -63,7 +70,7 @@ export async function middleware(request: NextRequest) {
 
   const isAdmin = isAdminUser(user);
 
-  if (user && !isAdmin && !isLoginRoute && !isAccessDeniedRoute) {
+  if (user && !isAdmin && !isAuthPublicRoute && !isAccessDeniedRoute) {
     const deniedUrl = request.nextUrl.clone();
     deniedUrl.pathname = "/admin/access-denied";
     deniedUrl.search = "";
