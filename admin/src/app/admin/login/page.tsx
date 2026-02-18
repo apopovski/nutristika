@@ -18,21 +18,32 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const supabaseClient = getSupabaseClient();
+    try {
+      const supabaseClient = getSupabaseClient();
 
-    const { error } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
 
-    if (error) {
-      setErrorMessage(error.message || "Unable to sign in. Please try again.");
+      if (error) {
+        setErrorMessage(error.message || "Unable to sign in. Please try again.");
+        return;
+      }
+
+      if (!data?.session) {
+        setErrorMessage("Sign-in succeeded but no active session was created. Please try again.");
+        return;
+      }
+
+      router.push("/admin/dashboard");
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unexpected error during sign in.";
+      setErrorMessage(message);
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    router.push("/admin/dashboard");
-    router.refresh();
   };
 
   return (
