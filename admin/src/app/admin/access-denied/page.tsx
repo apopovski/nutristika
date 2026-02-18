@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { supabaseClient } from "@/lib/supabaseClient";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 
 export default function AccessDeniedPage() {
   const router = useRouter();
 
   const handleBackToLogin = async () => {
+    const supabaseClient = getSupabaseClient();
     await supabaseClient.auth.signOut();
     router.replace("/admin/login");
     router.refresh();

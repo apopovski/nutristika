@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { supabaseClient } from "@/lib/supabaseClient";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 
 const titleMap: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
@@ -19,6 +19,7 @@ export function AdminTopBar() {
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
+    const supabaseClient = getSupabaseClient();
     await supabaseClient.auth.signOut();
     router.replace("/admin/login");
     router.refresh();

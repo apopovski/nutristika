@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseClient } from "@/lib/supabaseClient";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -16,6 +16,8 @@ export default function AdminLoginPage() {
     event.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
+
+    const supabaseClient = getSupabaseClient();
 
     const { error } = await supabaseClient.auth.signInWithPassword({
       email,

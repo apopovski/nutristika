@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { supabaseClient } from "@/lib/supabaseClient";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type HomepageContentRow = {
   id: number | string;
@@ -36,6 +36,8 @@ export default function HomepageEditorPage() {
     const loadContent = async () => {
       setIsLoading(true);
       setBanner(null);
+
+      const supabaseClient = getSupabaseClient();
 
       const { data, error } = await supabaseClient
         .from("homepage_content")
@@ -76,6 +78,8 @@ export default function HomepageEditorPage() {
     event.preventDefault();
     setIsSaving(true);
     setBanner(null);
+
+    const supabaseClient = getSupabaseClient();
 
     const payload = {
       title: title.trim(),
