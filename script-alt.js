@@ -1881,6 +1881,33 @@
   };
 
   const getLiveCommandActionItems = () => {
+    const resolveCommandCategory = ({ liveAction, elementAction, sectionAction, batchAction, templateAction, historyFilter, historyAction }) => {
+      if (elementAction) return "Element";
+      if (sectionAction || batchAction || templateAction) return "Sections";
+
+      if (historyFilter || historyAction) return "History";
+
+      if (liveAction) {
+        if (["viewport", "toggle-grid", "toggle-snap", "toggle-magnetic", "toggle-canvas", "canvas-zoom", "snap-size"].includes(liveAction)) {
+          return "Canvas";
+        }
+
+        if (["set-dock", "toggle-compact", "toggle-collapse", "toggle-hud", "toggle-beginner", "toggle-autosave", "save-now", "undo"].includes(liveAction)) {
+          return "Editor";
+        }
+      }
+
+      return "Actions";
+    };
+
+    const resolveCommandMeta = ({ liveAction, elementAction, sectionAction, batchAction, templateAction, historyFilter, historyAction }) => {
+      const raw = liveAction || elementAction || sectionAction || batchAction || templateAction || historyFilter || historyAction || "action";
+      return String(raw)
+        .replace(/[-_]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+
     const actionButtons = [...liveEditorRoot.querySelectorAll("button")]
       .filter((node) => node instanceof HTMLButtonElement)
       .filter((button) => {
@@ -1909,10 +1936,33 @@
         const historyFilter = button.getAttribute("data-history-filter") || "";
         const historyAction = button.getAttribute("data-history-action") || "";
         const key = `${label}|${liveAction}|${elementAction}|${sectionAction}|${batchAction}|${templateAction}|${historyFilter}|${historyAction}`;
+
+        const category = resolveCommandCategory({
+          liveAction,
+          elementAction,
+          sectionAction,
+          batchAction,
+          templateAction,
+          historyFilter,
+          historyAction
+        });
+
+        const meta = resolveCommandMeta({
+          liveAction,
+          elementAction,
+          sectionAction,
+          batchAction,
+          templateAction,
+          historyFilter,
+          historyAction
+        });
+
         return {
           key,
           label: label || "Action",
           searchable: `${label} ${liveAction} ${elementAction} ${sectionAction} ${batchAction} ${templateAction} ${historyFilter} ${historyAction}`.toLowerCase(),
+          category,
+          meta,
           button
         };
       })
@@ -1922,6 +1972,47 @@
         dedupe.add(item.key);
         return true;
       });
+  };
+
+  const scoreLiveCommandItem = (item, rawQuery) => {
+    const query = String(rawQuery || "").trim().toLowerCase();
+    if (!query) return 1;
+
+    const label = String(item?.label || "").toLowerCase();
+    const searchable = String(item?.searchable || "").toLowerCase();
+    let score = 0;
+
+    if (label.startsWith(query)) score += 120;
+    if (label.includes(query)) score += 70;
+    if (searchable.includes(query)) score += 36;
+
+    const tokens = query.split(/\s+/).filter(Boolean);
+    tokens.forEach((token) => {
+      if (label.startsWith(token)) {
+        score += 30;
+      } else if (label.includes(token)) {
+        score += 16;
+      } else if (searchable.includes(token)) {
+        score += 8;
+      } else {
+        score -= 24;
+      }
+    });
+
+    const compactLabel = label.replace(/\s+/g, "");
+    const compactQuery = query.replace(/\s+/g, "");
+    let qIndex = 0;
+    for (let i = 0; i < compactLabel.length && qIndex < compactQuery.length; i += 1) {
+      if (compactLabel[i] === compactQuery[qIndex]) {
+        qIndex += 1;
+      }
+    }
+    if (compactQuery && qIndex === compactQuery.length) {
+      score += 18;
+    }
+
+    score += Math.max(0, 14 - Math.max(0, label.length - query.length));
+    return score;
   };
 
   const setLiveCommandActiveItem = (nextIndex) => {
@@ -1961,7 +2052,14 @@
     const query = String(rawQuery || "").trim().toLowerCase();
     const all = getLiveCommandActionItems();
     liveEditorCommandFilteredActions = query
-      ? all.filter((item) => item.searchable.includes(query))
+      ? all
+        .map((item) => ({ item, score: scoreLiveCommandItem(item, query) }))
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.item.label.localeCompare(b.item.label);
+        })
+        .map((entry) => entry.item)
       : all;
 
     liveEditorCommandList.innerHTML = "";
@@ -1982,7 +2080,27 @@
       button.className = "live-editor-command__item";
       button.setAttribute("data-live-command-index", String(index));
       button.setAttribute("data-active", String(index === 0));
-      button.textContent = item.label;
+
+      const main = document.createElement("span");
+      main.className = "live-editor-command__item-main";
+
+      const label = document.createElement("span");
+      label.className = "live-editor-command__item-label";
+      label.textContent = item.label;
+
+      const category = document.createElement("span");
+      category.className = "live-editor-command__item-category";
+      category.textContent = item.category || "Actions";
+
+      main.appendChild(label);
+      main.appendChild(category);
+
+      const meta = document.createElement("span");
+      meta.className = "live-editor-command__item-meta";
+      meta.textContent = item.meta || "action";
+
+      button.appendChild(main);
+      button.appendChild(meta);
       li.appendChild(button);
       liveEditorCommandList.appendChild(li);
     });
