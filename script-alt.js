@@ -843,9 +843,87 @@
 
   const getActiveLang = () => localStorage.getItem("site-language") || detectPreferredLanguage();
 
+  const findElementByLayoutKey = (layoutKey) => {
+    if (!layoutKey) return null;
+    const matches = document.querySelectorAll("[data-layout-key]");
+    for (const node of matches) {
+      if (!(node instanceof HTMLElement)) continue;
+      if ((node.getAttribute("data-layout-key") || "") === layoutKey) {
+        return node;
+      }
+    }
+    return null;
+  };
+
+  const getNodeIdentityKey = (node) => {
+    if (!(node instanceof HTMLElement)) return "";
+
+    const layoutKey = node.getAttribute("data-layout-key");
+    if (layoutKey) return `layout:${layoutKey}`;
+
+    const i18nKey = node.getAttribute("data-i18n");
+    if (i18nKey) return `i18n:${i18nKey}`;
+
+    const placeholderKey = node.getAttribute("data-i18n-placeholder");
+    if (placeholderKey) return `placeholder:${placeholderKey}`;
+
+    const imageKey = node.getAttribute("data-image-key");
+    if (imageKey) return `image:${imageKey}`;
+
+    const iconKey = node.getAttribute("data-icon-key");
+    if (iconKey) return `icon:${iconKey}`;
+
+    return "";
+  };
+
+  const parseOrderListValue = (rawValue) => {
+    if (typeof rawValue !== "string" || !rawValue.trim()) return [];
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
+  const applyStoredParentOrders = () => {
+    const byKey = siteContentOverrides?.textByKey || {};
+    const orderKeys = Object.keys(byKey).filter((key) => key.startsWith("order.parent."));
+
+    orderKeys.forEach((orderKey) => {
+      const parentKey = orderKey.slice("order.parent.".length);
+      if (!parentKey) return;
+
+      const parent = findElementByLayoutKey(parentKey);
+      if (!(parent instanceof HTMLElement)) return;
+
+      const rawOrder = getTextOverride(orderKey, "all") || "";
+      const orderList = parseOrderListValue(rawOrder);
+      if (!orderList.length) return;
+
+      const identityToNode = new Map();
+      [...parent.children].forEach((child) => {
+        if (!(child instanceof HTMLElement)) return;
+        const identity = getNodeIdentityKey(child);
+        if (!identity || identityToNode.has(identity)) return;
+        identityToNode.set(identity, child);
+      });
+
+      orderList.forEach((identity) => {
+        const node = identityToNode.get(identity);
+        if (!(node instanceof HTMLElement)) return;
+        parent.appendChild(node);
+      });
+    });
+  };
+
   const rerenderLiveState = () => {
     applyImageOverrides();
     applyStoredDuplicateNodes();
+    applyStoredParentOrders();
     applyLanguage(getActiveLang());
     wireLiveEditableNodes();
   };
@@ -860,6 +938,29 @@
     if (typeof entry[lang] === "string") return entry[lang];
     if (typeof entry.all === "string") return entry.all;
     return null;
+  };
+
+  const persistParentChildOrder = async (parent) => {
+    if (!(parent instanceof HTMLElement)) return false;
+    const parentKey = parent.getAttribute("data-layout-key") || "";
+    if (!parentKey) return false;
+
+    const orderList = [...parent.children]
+      .map((child) => getNodeIdentityKey(child))
+      .filter(Boolean);
+
+    if (orderList.length < 2) return false;
+
+    const orderKey = `order.parent.${parentKey}`;
+    const encoded = JSON.stringify(orderList);
+    const save = await saveLiveOverride({ key: orderKey, value: encoded, type: "text", language: "all" });
+    if (!save.ok) return false;
+
+    if (!siteContentOverrides.textByKey[orderKey]) {
+      siteContentOverrides.textByKey[orderKey] = {};
+    }
+    siteContentOverrides.textByKey[orderKey].all = encoded;
+    return true;
   };
 
   const applyStoredDuplicateNodes = () => {
@@ -1757,11 +1858,16 @@
       parent.insertBefore(next, selectedNode);
     }
 
+    const persisted = await persistParentChildOrder(parent);
+
     selectedNodeDetails = getInspectorDetails(selectedNode);
     updateLiveElementEditorPanel();
     updateLiveEditorQuickbarPosition();
     updateLiveEditorSelectionOverlay();
-    setLiveEditorStatus(`Moved ${selectedNodeKey} ${direction} in flow for auto spacing/alignment.`, "success");
+    setLiveEditorStatus(
+      `Moved ${selectedNodeKey} ${direction} in flow for auto spacing/alignment${persisted ? " (saved)" : ""}.`,
+      "success"
+    );
     return true;
   };
 
@@ -4151,6 +4257,7 @@
 
     applyImageOverrides();
     applyStoredDuplicateNodes();
+    applyStoredParentOrders();
     wireLiveEditableNodes();
     const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
     applyLanguage(activeLang);
