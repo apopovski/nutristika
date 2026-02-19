@@ -973,17 +973,54 @@
 
   const liveEditorStatus = liveEditorRoot.querySelector(".key-inspector__status");
   const liveWidthInput = liveEditorRoot.querySelector("#live-slider-width");
+  const liveEditorHud = document.createElement("div");
+  liveEditorHud.className = "live-editor-hud";
+  liveEditorHud.innerHTML = `
+    <p class="live-editor-hud__key">No selection</p>
+    <p class="live-editor-hud__coords">x: 0 · y: 0</p>
+  `;
+
+  const liveEditorHudKey = liveEditorHud.querySelector(".live-editor-hud__key");
+  const liveEditorHudCoords = liveEditorHud.querySelector(".live-editor-hud__coords");
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
   let suppressLiveClickUntil = 0;
   let dragScopeMode = "child";
   let nudgeSaveTimer = null;
+  let hudHideTimer = null;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
     liveEditorStatus.textContent = message;
     liveEditorStatus.setAttribute("data-tone", tone);
+  };
+
+  const showLiveEditorHud = ({ key, x, y }) => {
+    if (liveEditorHudKey) {
+      liveEditorHudKey.textContent = key || "No selection";
+    }
+    if (liveEditorHudCoords) {
+      liveEditorHudCoords.textContent = `x: ${x} · y: ${y}`;
+    }
+
+    if (hudHideTimer) {
+      window.clearTimeout(hudHideTimer);
+      hudHideTimer = null;
+    }
+
+    liveEditorHud.classList.add("is-visible");
+  };
+
+  const hideLiveEditorHudSoon = (delay = 1400) => {
+    if (hudHideTimer) {
+      window.clearTimeout(hudHideTimer);
+    }
+
+    hudHideTimer = window.setTimeout(() => {
+      hudHideTimer = null;
+      liveEditorHud.classList.remove("is-visible");
+    }, delay);
   };
 
   const setSelectedNode = (node, key) => {
@@ -996,6 +1033,8 @@
 
     if (selectedNode instanceof HTMLElement) {
       selectedNode.setAttribute("data-live-selected", "true");
+      const coords = getTranslateFromElement(selectedNode);
+      showLiveEditorHud({ key: selectedNodeKey, x: coords.x, y: coords.y });
     }
   };
 
@@ -1089,6 +1128,7 @@
     }
     siteContentOverrides.textByKey[translateKey].all = `${x},${y}`;
     setLiveEditorStatus(`Saved position (${getActiveBreakpoint()}) for ${key}`, "success");
+    hideLiveEditorHudSoon();
   };
 
   const isTextInputContext = (eventTarget) => {
@@ -1106,6 +1146,7 @@
     const nextX = origin.x + dx;
     const nextY = origin.y + dy;
     selectedNode.style.transform = `translate(${nextX}px, ${nextY}px)`;
+    showLiveEditorHud({ key: selectedNodeKey, x: nextX, y: nextY });
 
     if (nudgeSaveTimer) {
       window.clearTimeout(nudgeSaveTimer);
@@ -1135,7 +1176,10 @@
       if (!didMove && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
         didMove = true;
       }
-      el.style.transform = `translate(${originX + dx}px, ${originY + dy}px)`;
+      const nextX = originX + dx;
+      const nextY = originY + dy;
+      el.style.transform = `translate(${nextX}px, ${nextY}px)`;
+      showLiveEditorHud({ key, x: nextX, y: nextY });
     };
 
     const onUp = async () => {
@@ -1226,6 +1270,7 @@
 
   if (editorParam === "1") {
     document.body.appendChild(liveEditorRoot);
+    document.body.appendChild(liveEditorHud);
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
