@@ -1751,6 +1751,10 @@ body.live-editor-enabled {
   --live-editor-panel-opacity: 0.95;
 }
 
+body.live-editor-enabled.live-editor-panel-collapsed {
+  --live-editor-panel-width: 72px;
+}
+
 body.live-editor-enabled main,
 body.live-editor-enabled .footer {
   width: calc(100% - var(--live-editor-panel-width));
@@ -1910,6 +1914,18 @@ body.live-editor-enabled.live-editor-panel-compact .live-editor-history {
   font-size: 0.62rem;
   padding-inline: 0.38rem;
   padding-block: 0.34rem;
+}
+
+.live-editor-rail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.2rem;
+  margin-bottom: 0.22rem;
+}
+
+.live-editor-rail .key-inspector__toggle {
+  font-size: 0.54rem;
+  padding-block: 0.28rem;
 }
 
 .live-element-editor {
@@ -2107,6 +2123,25 @@ body.live-editor-enabled.live-editor-panel-compact .live-editor-history {
   padding: 0.34rem 0.42rem;
   font-family: "Space Grotesk", system-ui, sans-serif;
   font-size: 0.66rem;
+}
+
+.live-editor-panel.is-collapsed {
+  overflow: visible;
+}
+
+.live-editor-panel.is-collapsed > :not(.live-editor-rail) {
+  display: none !important;
+}
+
+.live-editor-panel.is-collapsed .live-editor-rail {
+  grid-template-columns: 1fr;
+  position: sticky;
+  top: 0.38rem;
+}
+
+.live-editor-panel.is-collapsed .live-editor-rail .key-inspector__toggle {
+  min-height: 34px;
+  padding-inline: 0.2rem;
 }
 
 .live-editor-panel .is-filter-hidden {

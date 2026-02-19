@@ -710,6 +710,7 @@
   const LIVE_EDITOR_HUD_VISIBLE_KEY = "nutristika-live-editor-hud-visible";
   const LIVE_EDITOR_DOCK_KEY = "nutristika-live-editor-dock";
   const LIVE_EDITOR_COMPACT_KEY = "nutristika-live-editor-compact";
+  const LIVE_EDITOR_COLLAPSED_KEY = "nutristika-live-editor-collapsed";
   const LIVE_EDITOR_PANEL_OPACITY_KEY = "nutristika-live-editor-panel-opacity";
   const LIVE_EDITOR_BEGINNER_KEY = "nutristika-live-editor-beginner";
   const params = new URLSearchParams(window.location.search);
@@ -1301,6 +1302,11 @@
   const liveEditorRoot = document.createElement("div");
   liveEditorRoot.className = "key-inspector live-editor-panel";
   liveEditorRoot.innerHTML = `
+    <div class="live-editor-rail" data-live-rail>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-collapse" data-live-search-pin="true">Collapse</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="save-now" data-live-search-pin="true">Save</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="undo" data-live-search-pin="true">Undo</button>
+    </div>
     <p class="key-inspector__hint"><strong>Live Editor</strong> — click text/image to edit instantly.</p>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-beginner" data-active="true">Ease mode: On</button>
@@ -1622,6 +1628,7 @@
     ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "left")
     : "left";
   let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) !== "false";
+  let liveEditorCollapsed = localStorage.getItem(LIVE_EDITOR_COLLAPSED_KEY) === "true";
   let liveEditorBeginner = localStorage.getItem(LIVE_EDITOR_BEGINNER_KEY) !== "false";
   let selectedNodeDetails = null;
   const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
@@ -1806,6 +1813,10 @@
     ].filter((node) => node instanceof HTMLElement);
 
     allButtons.forEach((button) => {
+      if (button.getAttribute("data-live-search-pin") === "true") {
+        button.classList.remove("is-filter-hidden");
+        return;
+      }
       const text = (button.textContent || "").toLowerCase();
       const action = (button.getAttribute("data-live-action") || "").toLowerCase();
       const elementAction = (button.getAttribute("data-live-element-action") || "").toLowerCase();
@@ -1821,6 +1832,17 @@
         .some((node) => node instanceof HTMLElement && !node.classList.contains("is-filter-hidden"));
       group.classList.toggle("is-filter-hidden", !hasVisible && Boolean(query));
     });
+  };
+
+  const applyLiveEditorCollapsedState = () => {
+    document.body.classList.toggle("live-editor-panel-collapsed", liveEditorCollapsed);
+    liveEditorRoot.classList.toggle("is-collapsed", liveEditorCollapsed);
+
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-collapse"]');
+    if (button instanceof HTMLElement) {
+      button.setAttribute("data-active", String(liveEditorCollapsed));
+      button.textContent = liveEditorCollapsed ? "Expand" : "Collapse";
+    }
   };
 
   const getTopLevelEditableSections = () => {
@@ -3775,6 +3797,7 @@
     liveCanvasMode = true;
     liveCanvasZoomMode = "fit";
     applyLiveEditorPanelPlacement();
+    applyLiveEditorCollapsedState();
     applyLiveEditorBeginnerMode();
     applyLiveEditorPanelOpacity();
     updateLiveHudToggleButton();
@@ -4536,6 +4559,19 @@
       updateLiveEditorQuickbarPosition();
       updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`Minimal panel ${liveEditorCompact ? "enabled" : "disabled"}.`, "info");
+      return;
+    }
+
+    if (action === "toggle-collapse") {
+      liveEditorCollapsed = !liveEditorCollapsed;
+      localStorage.setItem(LIVE_EDITOR_COLLAPSED_KEY, String(liveEditorCollapsed));
+      applyLiveEditorCollapsedState();
+      applyViewportProfileToBody();
+      updateCanvasZoomButtons();
+      updateCanvasMinimap();
+      updateLiveEditorQuickbarPosition();
+      updateLiveEditorSelectionOverlay();
+      setLiveEditorStatus(`Editor ${liveEditorCollapsed ? "collapsed" : "expanded"}.`, "info");
       return;
     }
 
