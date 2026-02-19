@@ -685,6 +685,9 @@
      ---------------------------------------------------------- */
   const INSPECTOR_STORAGE_KEY = "nutristika-key-inspector";
   const LIVE_EDITOR_TOKEN_KEY = "nutristika-live-editor-token";
+  const LIVE_EDITOR_HUD_VISIBLE_KEY = "nutristika-live-editor-hud-visible";
+  const LIVE_EDITOR_DOCK_KEY = "nutristika-live-editor-dock";
+  const LIVE_EDITOR_COMPACT_KEY = "nutristika-live-editor-compact";
   const params = new URLSearchParams(window.location.search);
   const inspectorParam = params.get("inspector");
   const editorParam = params.get("editor");
@@ -1185,12 +1188,6 @@
       <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="24">Snap 24</button>
     </div>
     <div class="live-editor-actions">
-      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1728">MBP 16"</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1280">MBP 13"</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1024">Tablet 11"</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w390">Phone</button>
-    </div>
-    <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-canvas" data-active="false">Canvas mode: Off</button>
     </div>
     <div class="live-editor-actions live-editor-actions--zoom">
@@ -1212,9 +1209,16 @@
         <div class="live-editor-minimap__viewport" data-live-minimap-viewport></div>
       </div>
     </div>
-    <label class="key-inspector__hint" for="live-resolution-width">Custom preview width</label>
+    <label class="key-inspector__hint" for="live-resolution-width">Screen resolution</label>
     <input id="live-resolution-width" type="range" min="320" max="1920" step="8" value="1280" />
-    <p class="key-inspector__hint" data-live-resolution-label>Resolution: auto</p>
+    <p class="key-inspector__hint" data-live-resolution-label>Screen: auto</p>
+    <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="set-dock" data-dock="right">Panel: Right</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="set-dock" data-dock="left">Panel: Left</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="set-dock" data-dock="bottom">Panel: Bottom</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-compact" data-active="false">Minimal panel: Off</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-hud" data-active="true">Coords popup: On</button>
+    </div>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-autosave" data-active="true">Autosave: On</button>
       <button type="button" class="key-inspector__toggle" data-live-action="save-now">Save now</button>
@@ -1340,6 +1344,11 @@
   let liveMagneticGuidesEnabled = false;
   let minimapPointerDown = false;
   let liveSnapGridSize = 8;
+  let liveEditorHudEnabled = localStorage.getItem(LIVE_EDITOR_HUD_VISIBLE_KEY) !== "false";
+  let liveEditorDock = ["right", "left", "bottom"].includes(localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "")
+    ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "right")
+    : "right";
+  let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) === "true";
   const liveMagneticThreshold = 10;
 
   const setLiveEditorStatus = (message, tone = "info") => {
@@ -1368,7 +1377,12 @@
     const panelWidth = liveEditorRoot instanceof HTMLElement
       ? Math.round(liveEditorRoot.getBoundingClientRect().width)
       : 0;
-    const maxRight = Math.max(16, window.innerWidth - panelWidth - 16);
+    const minLeft = liveEditorDock === "left"
+      ? Math.max(16, panelWidth + 16)
+      : 16;
+    const maxRight = liveEditorDock === "right"
+      ? Math.max(minLeft, window.innerWidth - panelWidth - 16)
+      : Math.max(minLeft, window.innerWidth - 16);
 
     let left = Math.round(rect.left + rect.width / 2);
     let top = Math.round(rect.top - 14);
@@ -1378,7 +1392,7 @@
       top = 74;
     }
 
-    const clampedLeft = Math.min(maxRight, Math.max(16, left));
+    const clampedLeft = Math.min(maxRight, Math.max(minLeft, left));
     const clampedTop = Math.min(window.innerHeight - 18, Math.max(56, top));
 
     liveEditorQuickbar.style.left = `${clampedLeft}px`;
@@ -1415,6 +1429,8 @@
   };
 
   const showLiveEditorHud = ({ key, x, y }) => {
+    if (!liveEditorHudEnabled) return;
+
     if (liveEditorHudKey) {
       liveEditorHudKey.textContent = key || "No selection";
     }
@@ -1428,6 +1444,33 @@
     }
 
     liveEditorHud.classList.add("is-visible");
+  };
+
+  const updateLiveHudToggleButton = () => {
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-hud"]');
+    if (!(button instanceof HTMLElement)) return;
+    button.setAttribute("data-active", String(liveEditorHudEnabled));
+    button.textContent = `Coords popup: ${liveEditorHudEnabled ? "On" : "Off"}`;
+  };
+
+  const applyLiveEditorPanelPlacement = () => {
+    document.body.classList.remove("live-editor-dock-right", "live-editor-dock-left", "live-editor-dock-bottom");
+    document.body.classList.add(`live-editor-dock-${liveEditorDock}`);
+    document.body.classList.toggle("live-editor-panel-compact", liveEditorCompact);
+
+    liveEditorRoot.querySelectorAll('[data-live-action="set-dock"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const dock = button.getAttribute("data-dock") || "";
+      const isActive = dock === liveEditorDock;
+      button.setAttribute("data-active", String(isActive));
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+
+    const compactButton = liveEditorRoot.querySelector('[data-live-action="toggle-compact"]');
+    if (compactButton instanceof HTMLElement) {
+      compactButton.setAttribute("data-active", String(liveEditorCompact));
+      compactButton.textContent = `Minimal panel: ${liveEditorCompact ? "On" : "Off"}`;
+    }
   };
 
   const hideLiveEditorHudSoon = (delay = 1400) => {
@@ -1900,13 +1943,6 @@
     });
 
     const activeProfile = getActiveViewportProfile();
-    liveEditorRoot.querySelectorAll('[data-live-action="viewport-profile"]').forEach((button) => {
-      if (!(button instanceof HTMLElement)) return;
-      const profile = button.getAttribute("data-profile") || "";
-      const isActive = profile === activeProfile;
-      button.setAttribute("data-active", String(isActive));
-      button.setAttribute("aria-pressed", String(isActive));
-    });
 
     if (liveResolutionInput instanceof HTMLInputElement) {
       const match = String(activeProfile).match(/^w(\d{3,4})$/);
@@ -1918,9 +1954,9 @@
     if (liveResolutionLabel instanceof HTMLElement) {
       const bp = getBreakpointFromProfile(activeProfile);
       if (/^w\d{3,4}$/.test(String(activeProfile))) {
-        liveResolutionLabel.textContent = `Resolution: ${String(activeProfile).slice(1)}px (${bp})`;
+        liveResolutionLabel.textContent = `Screen: ${String(activeProfile).slice(1)}px (${bp})`;
       } else {
-        liveResolutionLabel.textContent = `Resolution: ${bp}`;
+        liveResolutionLabel.textContent = `Screen: ${bp}`;
       }
     }
   };
@@ -2696,6 +2732,11 @@
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
+    applyLiveEditorPanelPlacement();
+    updateLiveHudToggleButton();
+    if (!liveEditorHudEnabled) {
+      liveEditorHud.classList.remove("is-visible");
+    }
     applyViewportProfileToBody();
     updateViewportButtons();
     updateVisibilityButtons();
@@ -2804,6 +2845,7 @@
       applyLayoutOverrides();
       updateSelectedTypographyControls();
       updateLiveEditorSelectionOverlay();
+      setLiveEditorStatus(`Editing custom resolution ${liveResolutionInput.value}px`, "info");
     });
   }
 
@@ -2979,18 +3021,48 @@
     }
 
     if (action === "viewport-profile") {
-      const profile = target.getAttribute("data-profile") || "";
-      if (!/^w\d{3,4}$/.test(profile)) return;
-      liveEditorViewport = profile;
+      return;
+    }
+
+    if (action === "set-dock") {
+      const dock = target.getAttribute("data-dock") || "";
+      if (!(dock === "right" || dock === "left" || dock === "bottom")) return;
+      liveEditorDock = dock;
+      localStorage.setItem(LIVE_EDITOR_DOCK_KEY, liveEditorDock);
+      applyLiveEditorPanelPlacement();
       applyViewportProfileToBody();
       updateCanvasZoomButtons();
       updateCanvasMinimap();
-      updateViewportButtons();
-      updateVisibilityButtons();
-      applyLayoutOverrides();
-      updateSelectedTypographyControls();
+      updateLiveEditorQuickbarPosition();
       updateLiveEditorSelectionOverlay();
-      setLiveEditorStatus(`Editing custom resolution ${profile.slice(1)}px`, "info");
+      setLiveEditorStatus(`Editor panel moved to ${dock}.`, "info");
+      return;
+    }
+
+    if (action === "toggle-compact") {
+      liveEditorCompact = !liveEditorCompact;
+      localStorage.setItem(LIVE_EDITOR_COMPACT_KEY, String(liveEditorCompact));
+      applyLiveEditorPanelPlacement();
+      applyViewportProfileToBody();
+      updateCanvasZoomButtons();
+      updateCanvasMinimap();
+      updateLiveEditorQuickbarPosition();
+      updateLiveEditorSelectionOverlay();
+      setLiveEditorStatus(`Minimal panel ${liveEditorCompact ? "enabled" : "disabled"}.`, "info");
+      return;
+    }
+
+    if (action === "toggle-hud") {
+      liveEditorHudEnabled = !liveEditorHudEnabled;
+      localStorage.setItem(LIVE_EDITOR_HUD_VISIBLE_KEY, String(liveEditorHudEnabled));
+      updateLiveHudToggleButton();
+      if (!liveEditorHudEnabled) {
+        liveEditorHud.classList.remove("is-visible");
+      } else if (selectedNode instanceof HTMLElement && selectedNodeKey) {
+        const { x, y } = getTranslateFromElement(selectedNode);
+        showLiveEditorHud({ key: selectedNodeKey, x, y });
+      }
+      setLiveEditorStatus(`Coordinates popup ${liveEditorHudEnabled ? "enabled" : "disabled"}.`, "info");
       return;
     }
 

@@ -1732,7 +1732,7 @@ body.inspector-enabled [data-layout-key] {
   right: 0;
   top: 0;
   bottom: 0;
-  width: min(430px, 34vw);
+  width: var(--live-editor-panel-width, min(430px, 34vw));
   max-height: 100vh;
   overflow: auto;
   border-radius: 0;
@@ -1750,6 +1750,56 @@ body.live-editor-enabled {
 body.live-editor-enabled main,
 body.live-editor-enabled .footer {
   width: calc(100% - var(--live-editor-panel-width));
+}
+
+body.live-editor-enabled.live-editor-dock-left main,
+body.live-editor-enabled.live-editor-dock-left .footer,
+body.live-editor-enabled.live-editor-dock-right main,
+body.live-editor-enabled.live-editor-dock-right .footer {
+  width: calc(100% - var(--live-editor-panel-width));
+}
+
+body.live-editor-enabled.live-editor-dock-bottom main,
+body.live-editor-enabled.live-editor-dock-bottom .footer {
+  width: 100%;
+}
+
+body.live-editor-enabled.live-editor-dock-left .live-editor-panel {
+  left: 0;
+  right: auto;
+  border-left: 0;
+  border-right-width: 2px;
+}
+
+body.live-editor-enabled.live-editor-dock-right .live-editor-panel {
+  left: auto;
+  right: 0;
+  border-right: 0;
+  border-left-width: 2px;
+}
+
+body.live-editor-enabled.live-editor-dock-bottom .live-editor-panel {
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: 1rem;
+  width: min(920px, calc(100vw - 2rem));
+  max-height: min(48vh, 520px);
+  border: 2px solid rgba(22, 106, 69, 0.85);
+  border-radius: 14px;
+  transform: translateX(-50%);
+}
+
+body.live-editor-enabled.live-editor-panel-compact {
+  --live-editor-panel-width: min(320px, 28vw);
+}
+
+body.live-editor-enabled.live-editor-panel-compact .live-editor-panel {
+  font-size: 0.94em;
+}
+
+body.live-editor-enabled.live-editor-panel-compact .live-editor-history {
+  display: none;
 }
 
 .live-editor-actions {
@@ -2440,5 +2490,19 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   body.live-editor-enabled main,
   body.live-editor-enabled .footer {
     width: 100%;
+  }
+
+  body.live-editor-enabled.live-editor-dock-left .live-editor-panel,
+  body.live-editor-enabled.live-editor-dock-right .live-editor-panel,
+  body.live-editor-enabled.live-editor-dock-bottom .live-editor-panel {
+    right: auto;
+    top: auto;
+    bottom: 1rem;
+    left: 50%;
+    width: min(420px, calc(100vw - 2rem));
+    max-height: min(82vh, 760px);
+    border-radius: 14px;
+    border: 2px solid rgba(22, 106, 69, 0.85);
+    transform: translateX(-50%);
   }
 }
