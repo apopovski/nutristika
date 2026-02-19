@@ -827,6 +827,7 @@
   const undoStack = [];
   const liveActionHistory = [];
   let liveActionHistorySeq = 0;
+  let liveActionHistoryFilter = "all";
 
   const buildInverseOperation = (operation) => {
     const previousValue = operation.previousValue;
@@ -889,21 +890,52 @@
     return `${kind} ${type} · ${key}`;
   };
 
+  const getOperationCategory = (operation) => {
+    const key = operation.payload?.key || "";
+
+    if (/^layout\..+\.translate\.(desktop|tablet|mobile)$/.test(key)) {
+      return "position";
+    }
+
+    if (/^layout\..+\.hidden\.(desktop|tablet|mobile)$/.test(key)) {
+      return "visibility";
+    }
+
+    return "content";
+  };
+
+  const updateHistoryFilterButtons = () => {
+    liveEditorRoot.querySelectorAll("[data-history-filter]").forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const value = button.getAttribute("data-history-filter") || "all";
+      const active = value === liveActionHistoryFilter;
+      button.setAttribute("data-active", String(active));
+      button.setAttribute("aria-pressed", String(active));
+    });
+  };
+
   const renderLiveActionHistory = () => {
     const list = liveEditorRoot.querySelector(".live-editor-history__list");
     if (!(list instanceof HTMLElement)) return;
 
     list.innerHTML = "";
 
-    if (!liveActionHistory.length) {
+    const filtered = liveActionHistoryFilter === "all"
+      ? liveActionHistory
+      : liveActionHistory.filter((entry) => entry.category === liveActionHistoryFilter);
+
+    if (!filtered.length) {
       const empty = document.createElement("li");
       empty.className = "live-editor-history__item is-empty";
-      empty.textContent = "No actions yet.";
+      empty.textContent = liveActionHistory.length
+        ? "No matching actions for this filter."
+        : "No actions yet.";
       list.appendChild(empty);
+      updateHistoryFilterButtons();
       return;
     }
 
-    [...liveActionHistory].reverse().forEach((entry) => {
+    [...filtered].reverse().forEach((entry) => {
       const item = document.createElement("li");
       item.className = "live-editor-history__item";
 
@@ -923,12 +955,15 @@
       item.appendChild(button);
       list.appendChild(item);
     });
+
+    updateHistoryFilterButtons();
   };
 
   const addLiveActionHistoryEntry = (operation, inverseOperation) => {
     liveActionHistory.push({
       id: ++liveActionHistorySeq,
       label: formatOperationLabel(operation),
+      category: getOperationCategory(operation),
       inverseOperation,
       reverted: false
     });
@@ -1044,6 +1079,12 @@
     <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
     <div class="live-editor-history">
       <p class="live-editor-history__title">Recent actions</p>
+      <div class="live-editor-history__filters" role="group" aria-label="History filters">
+        <button type="button" class="live-editor-history__filter" data-history-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="live-editor-history__filter" data-history-filter="position" aria-pressed="false">Position</button>
+        <button type="button" class="live-editor-history__filter" data-history-filter="visibility" aria-pressed="false">Visibility</button>
+        <button type="button" class="live-editor-history__filter" data-history-filter="content" aria-pressed="false">Content</button>
+      </div>
       <ul class="live-editor-history__list"></ul>
     </div>
   `;
@@ -1516,6 +1557,13 @@
   liveEditorRoot.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const historyFilter = target.getAttribute("data-history-filter");
+    if (historyFilter === "all" || historyFilter === "position" || historyFilter === "visibility" || historyFilter === "content") {
+      liveActionHistoryFilter = historyFilter;
+      renderLiveActionHistory();
+      return;
+    }
 
     const historyAction = target.getAttribute("data-history-action");
     if (historyAction === "revert") {

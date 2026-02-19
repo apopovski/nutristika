@@ -1768,6 +1768,33 @@ body.inspector-enabled [data-layout-key] {
   margin-bottom: 0.32rem;
 }
 
+.live-editor-history__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-bottom: 0.36rem;
+}
+
+.live-editor-history__filter {
+  border: 1.5px solid rgba(17, 17, 17, 0.25);
+  border-radius: 999px;
+  background: #fff;
+  color: #303030;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.57rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+
+.live-editor-history__filter[data-active="true"] {
+  background: #114f34;
+  border-color: #114f34;
+  color: #fff;
+}
+
 .live-editor-history__list {
   list-style: none;
   display: grid;
