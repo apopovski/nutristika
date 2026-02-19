@@ -1335,6 +1335,16 @@
   liveEditorSpacingVertical.className = "live-editor-spacing live-editor-spacing--vertical";
   liveEditorSpacingVertical.innerHTML = "<span class=\"live-editor-spacing__label\"></span>";
   const liveEditorSpacingVerticalLabel = liveEditorSpacingVertical.querySelector(".live-editor-spacing__label");
+  const liveEditorContextMenu = document.createElement("div");
+  liveEditorContextMenu.className = "live-editor-context-menu";
+  liveEditorContextMenu.innerHTML = `
+    <button type="button" class="live-editor-context-menu__item" data-live-context-action="edit">Edit</button>
+    <button type="button" class="live-editor-context-menu__item" data-live-context-action="duplicate">Duplicate</button>
+    <button type="button" class="live-editor-context-menu__item" data-live-context-action="toggle-visibility">Hide</button>
+    <button type="button" class="live-editor-context-menu__item" data-live-context-action="reset-pos">Reset position</button>
+    <button type="button" class="live-editor-context-menu__item danger" data-live-context-action="remove">Remove</button>
+  `;
+  const liveEditorContextMenuVisibilityButton = liveEditorContextMenu.querySelector('[data-live-context-action="toggle-visibility"]');
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
@@ -1367,12 +1377,40 @@
     liveEditorStatus.setAttribute("data-tone", tone);
   };
 
-  const updateLiveEditorQuickbarVisibilityLabel = () => {
-    if (!(liveEditorQuickbarVisibilityButton instanceof HTMLButtonElement) || !selectedNodeKey) return;
+  const isSelectedNodeHiddenOnActiveProfile = () => {
+    if (!selectedNodeKey) return false;
     const profile = getActiveViewportProfile();
     const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
-    const isHidden = getTextOverride(hiddenKey, "all") === "1";
+    return getTextOverride(hiddenKey, "all") === "1";
+  };
+
+  const updateLiveEditorQuickbarVisibilityLabel = () => {
+    if (!(liveEditorQuickbarVisibilityButton instanceof HTMLButtonElement) || !selectedNodeKey) return;
+    const isHidden = isSelectedNodeHiddenOnActiveProfile();
     liveEditorQuickbarVisibilityButton.textContent = isHidden ? "Show" : "Hide";
+  };
+
+  const updateLiveEditorContextMenuVisibilityLabel = () => {
+    if (!(liveEditorContextMenuVisibilityButton instanceof HTMLButtonElement) || !selectedNodeKey) return;
+    const isHidden = isSelectedNodeHiddenOnActiveProfile();
+    liveEditorContextMenuVisibilityButton.textContent = isHidden ? "Show" : "Hide";
+  };
+
+  const hideLiveEditorContextMenu = () => {
+    liveEditorContextMenu.classList.remove("is-visible");
+  };
+
+  const showLiveEditorContextMenu = (clientX, clientY) => {
+    updateLiveEditorContextMenuVisibilityLabel();
+
+    const maxX = Math.max(8, window.innerWidth - 220);
+    const maxY = Math.max(8, window.innerHeight - 240);
+    const left = Math.min(maxX, Math.max(8, Math.round(clientX)));
+    const top = Math.min(maxY, Math.max(8, Math.round(clientY)));
+
+    liveEditorContextMenu.style.left = `${left}px`;
+    liveEditorContextMenu.style.top = `${top}px`;
+    liveEditorContextMenu.classList.add("is-visible");
   };
 
   const updateLiveEditorQuickbarPosition = () => {
@@ -1744,6 +1782,7 @@
     updateLiveEditorSelectionOverlay();
     if (!(selectedNode instanceof HTMLElement)) {
       clearLiveSpacingIndicators();
+      hideLiveEditorContextMenu();
     }
   };
 
@@ -2753,6 +2792,7 @@
     document.body.appendChild(liveEditorGuideHorizontal);
     document.body.appendChild(liveEditorSpacingHorizontal);
     document.body.appendChild(liveEditorSpacingVertical);
+    document.body.appendChild(liveEditorContextMenu);
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
@@ -2839,7 +2879,7 @@
     if (action === "toggle-visibility") {
       const profile = getActiveViewportProfile();
       const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
-      const isHidden = getTextOverride(hiddenKey, "all") === "1";
+      const isHidden = isSelectedNodeHiddenOnActiveProfile();
 
       if (isHidden) {
         await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
@@ -2855,6 +2895,68 @@
       applyLayoutOverrides();
       updateLiveEditorQuickbarPosition();
       updateLiveEditorSelectionOverlay();
+      setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} ${selectedNodeKey} on ${profile}`, "success");
+    }
+  });
+
+  liveEditorContextMenu.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const action = target.getAttribute("data-live-context-action");
+    if (!action) return;
+
+    if (!selectedNodeKey || !(selectedNode instanceof HTMLElement)) {
+      hideLiveEditorContextMenu();
+      setLiveEditorStatus("Select an element first.", "info");
+      return;
+    }
+
+    if (action === "edit") {
+      await editNodeByDetails(selectedNode, getInspectorDetails(selectedNode));
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    if (action === "duplicate") {
+      await duplicateSelectedNode();
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    if (action === "reset-pos") {
+      await resetSelectedCoords();
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    if (action === "remove") {
+      await removeSelectedNode();
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    if (action === "toggle-visibility") {
+      const profile = getActiveViewportProfile();
+      const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
+      const isHidden = isSelectedNodeHiddenOnActiveProfile();
+
+      if (isHidden) {
+        await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
+        delete siteContentOverrides.textByKey[hiddenKey];
+      } else {
+        await saveLiveOverride({ key: hiddenKey, value: "1", type: "text", language: "all" });
+        if (!siteContentOverrides.textByKey[hiddenKey]) {
+          siteContentOverrides.textByKey[hiddenKey] = {};
+        }
+        siteContentOverrides.textByKey[hiddenKey].all = "1";
+      }
+
+      applyLayoutOverrides();
+      updateLiveEditorSelectionOverlay();
+      updateLiveEditorQuickbarPosition();
+      updateLiveEditorContextMenuVisibilityLabel();
+      hideLiveEditorContextMenu();
       setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} ${selectedNodeKey} on ${profile}`, "success");
     }
   });
@@ -3504,7 +3606,12 @@
         return;
       }
 
-      if (liveEditorRoot.contains(event.target) || liveEditorHud.contains(event.target) || inspectorRoot.contains(event.target)) return;
+      if (liveEditorRoot.contains(event.target)
+        || liveEditorHud.contains(event.target)
+        || liveEditorContextMenu.contains(event.target)
+        || inspectorRoot.contains(event.target)) return;
+
+      hideLiveEditorContextMenu();
 
       const node = getInspectorNode(event.target);
       if (!node) return;
@@ -3564,7 +3671,11 @@
 
   document.addEventListener("dblclick", (event) => {
     if (!liveEditorEnabled) return;
-    if (liveEditorRoot.contains(event.target) || liveEditorHud.contains(event.target) || liveEditorQuickbar.contains(event.target) || inspectorRoot.contains(event.target)) return;
+    if (liveEditorRoot.contains(event.target)
+      || liveEditorHud.contains(event.target)
+      || liveEditorQuickbar.contains(event.target)
+      || liveEditorContextMenu.contains(event.target)
+      || inspectorRoot.contains(event.target)) return;
 
     const node = getInspectorNode(event.target);
     if (!(node instanceof HTMLElement)) return;
@@ -3577,6 +3688,35 @@
     void editNodeByDetails(node, details);
   }, true);
 
+  document.addEventListener("contextmenu", (event) => {
+    if (!liveEditorEnabled) return;
+    if (liveEditorRoot.contains(event.target)
+      || liveEditorHud.contains(event.target)
+      || liveEditorQuickbar.contains(event.target)
+      || liveEditorContextMenu.contains(event.target)
+      || inspectorRoot.contains(event.target)) {
+      return;
+    }
+
+    const node = getInspectorNode(event.target);
+    if (!(node instanceof HTMLElement)) {
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    const details = getInspectorDetails(node);
+    if (!details.key) {
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    setSelectedNode(node, details.key);
+    showLiveEditorContextMenu(event.clientX, event.clientY);
+  }, true);
+
   document.addEventListener("keydown", (event) => {
     if (liveEditorEnabled && (event.metaKey || event.ctrlKey) && !event.altKey) {
       if (isTextInputContext(event.target)) return;
@@ -3585,6 +3725,7 @@
       const isZoomIn = key === "+" || key === "=";
       const isZoomOut = key === "-" || key === "_";
       const isZoomReset = key === "0";
+      const isDuplicate = key.toLowerCase() === "d";
 
       if (isZoomIn || isZoomOut || isZoomReset) {
         event.preventDefault();
@@ -3598,6 +3739,13 @@
         const currentPercent = clampCanvasZoomPercent(Math.round(liveCanvasZoom * 100));
         const nextPercent = clampCanvasZoomPercent(currentPercent + (isZoomIn ? 5 : -5));
         setCanvasZoomMode(String(nextPercent / 100), { announce: true });
+        return;
+      }
+
+      if (isDuplicate) {
+        event.preventDefault();
+        event.stopPropagation();
+        void duplicateSelectedNode();
         return;
       }
     }
@@ -3632,6 +3780,22 @@
         document.body.appendChild(inspectorRoot);
       }
       setInspectorEnabled(!isInspectorEnabled);
+      return;
+    }
+
+    if (liveEditorEnabled && event.key === "Escape") {
+      hideLiveEditorContextMenu();
+      return;
+    }
+
+    if (liveEditorEnabled && (event.key === "Delete" || event.key === "Backspace")) {
+      if (isTextInputContext(event.target)) return;
+      if (liveEditorRoot.contains(event.target) || liveEditorContextMenu.contains(event.target)) return;
+      if (!selectedNodeKey) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      void removeSelectedNode();
     }
   });
 
