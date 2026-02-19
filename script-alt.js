@@ -2164,6 +2164,81 @@
     return true;
   };
 
+  const appendLiveCommandHighlightedText = (container, text, rawQuery) => {
+    if (!(container instanceof HTMLElement)) return;
+
+    const source = String(text || "");
+    const query = String(rawQuery || "").trim().toLowerCase();
+    container.textContent = "";
+
+    if (!query || !source) {
+      container.textContent = source;
+      return;
+    }
+
+    const tokens = query
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 6);
+
+    if (!tokens.length) {
+      container.textContent = source;
+      return;
+    }
+
+    const lower = source.toLowerCase();
+    const ranges = [];
+
+    tokens.forEach((token) => {
+      let fromIndex = 0;
+      while (fromIndex < lower.length) {
+        const start = lower.indexOf(token, fromIndex);
+        if (start < 0) break;
+        ranges.push({ start, end: start + token.length });
+        fromIndex = start + token.length;
+      }
+    });
+
+    if (!ranges.length) {
+      container.textContent = source;
+      return;
+    }
+
+    ranges.sort((a, b) => {
+      if (a.start !== b.start) return a.start - b.start;
+      return (b.end - b.start) - (a.end - a.start);
+    });
+
+    const merged = [];
+    ranges.forEach((range) => {
+      const prev = merged[merged.length - 1];
+      if (!prev || range.start >= prev.end) {
+        merged.push({ ...range });
+        return;
+      }
+      prev.end = Math.max(prev.end, range.end);
+    });
+
+    let cursor = 0;
+    merged.forEach((range) => {
+      if (range.start > cursor) {
+        container.appendChild(document.createTextNode(source.slice(cursor, range.start)));
+      }
+
+      const mark = document.createElement("mark");
+      mark.className = "live-editor-command__match";
+      mark.textContent = source.slice(range.start, range.end);
+      container.appendChild(mark);
+      cursor = range.end;
+    });
+
+    if (cursor < source.length) {
+      container.appendChild(document.createTextNode(source.slice(cursor)));
+    }
+  };
+
   const renderLiveCommandPalette = (rawQuery = "") => {
     if (!(liveEditorCommandList instanceof HTMLElement)) return;
     const query = String(rawQuery || "").trim().toLowerCase();
@@ -2210,7 +2285,7 @@
 
       const label = document.createElement("span");
       label.className = "live-editor-command__item-label";
-      label.textContent = item.label;
+      appendLiveCommandHighlightedText(label, item.label, query);
 
       const category = document.createElement("span");
       category.className = "live-editor-command__item-category";
@@ -2233,7 +2308,7 @@
 
       const meta = document.createElement("span");
       meta.className = "live-editor-command__item-meta";
-      meta.textContent = item.meta || "action";
+      appendLiveCommandHighlightedText(meta, item.meta || "action", query);
 
       button.appendChild(main);
       button.appendChild(meta);

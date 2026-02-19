@@ -3358,6 +3358,13 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   color: #4a5752;
 }
 
+.live-editor-command__match {
+  border-radius: 4px;
+  background: rgba(255, 200, 84, 0.36);
+  color: inherit;
+  padding: 0 0.1em;
+}
+
 .live-editor-command__item-category {
   border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 999px;
@@ -3396,6 +3403,11 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   border-color: rgba(22, 106, 69, 0.42);
   background: rgba(22, 106, 69, 0.12);
   color: #114f34;
+}
+
+.live-editor-command__item:hover .live-editor-command__match,
+.live-editor-command__item[data-active="true"] .live-editor-command__match {
+  background: rgba(255, 174, 51, 0.5);
 }
 
 .live-editor-command__item:hover .live-editor-command__item-shortcut,
