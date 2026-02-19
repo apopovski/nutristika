@@ -1001,6 +1001,7 @@
       const html = getTextOverride(`dup.node.${dupId}.html`, "all") || "";
       const parentKey = getTextOverride(`dup.node.${dupId}.parent`, "all") || "";
       const afterKey = getTextOverride(`dup.node.${dupId}.after`, "all") || "";
+      const place = getTextOverride(`dup.node.${dupId}.place`, "all") || "";
       if (!html || !parentKey) return;
 
       const parent = document.querySelector(`[data-layout-key="${parentKey}"]`);
@@ -1022,7 +1023,9 @@
         ? parent.querySelector(`[data-layout-key="${afterKey}"]`)
         : null;
 
-      if (afterNode instanceof HTMLElement && afterNode.parentElement === parent) {
+      if (place === "start") {
+        parent.insertBefore(node, parent.firstElementChild);
+      } else if (afterNode instanceof HTMLElement && afterNode.parentElement === parent) {
         parent.insertBefore(node, afterNode.nextSibling);
       } else {
         parent.appendChild(node);
@@ -1407,6 +1410,15 @@
       </div>
       <div class="live-element-editor__section" data-live-element-section="section">
         <p class="key-inspector__hint">Section tools</p>
+        <label class="key-inspector__hint" for="live-section-template">New section type</label>
+        <select id="live-section-template">
+          <option value="blank">Blank section</option>
+          <option value="story">Story section</option>
+          <option value="cta">CTA section</option>
+          <option value="faq">FAQ section</option>
+          <option value="quote">Quote section</option>
+          <option value="duplicate">Duplicate selected section</option>
+        </select>
         <div class="live-editor-actions">
           <button type="button" class="key-inspector__toggle" data-live-element-action="add-section-above">+ Section above</button>
           <button type="button" class="key-inspector__toggle" data-live-element-action="add-section-below">+ Section below</button>
@@ -1468,6 +1480,7 @@
   const liveElementEditorType = liveEditorRoot.querySelector("[data-live-element-type]");
   const liveElementTextInput = liveEditorRoot.querySelector("#live-element-text");
   const liveElementImageUrlInput = liveEditorRoot.querySelector("#live-element-image-url");
+  const liveSectionTemplateSelect = liveEditorRoot.querySelector("#live-section-template");
   const liveSectionHeightInput = liveEditorRoot.querySelector("#live-section-height");
   const liveSectionHeightLabel = liveEditorRoot.querySelector("[data-live-section-height-label]");
   const liveEditorHud = document.createElement("div");
@@ -1785,6 +1798,10 @@
       sectionSection.classList.toggle("is-hidden", !canEditSection);
     }
 
+    if (liveSectionTemplateSelect instanceof HTMLSelectElement) {
+      liveSectionTemplateSelect.disabled = !canEditSection;
+    }
+
     if (liveSectionHeightInput instanceof HTMLInputElement) {
       liveSectionHeightInput.disabled = !canEditSection;
       if (canEditSection) {
@@ -2055,19 +2072,132 @@
     const sectionKey = sectionNode.getAttribute("data-layout-key") || "";
     if (!sectionKey) return false;
 
-    setSelectedNode(sectionNode, sectionKey);
-    await duplicateSelectedNode();
-
-    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
-      setLiveEditorStatus("Could not create a new section.", "error");
+    const parent = sectionNode.parentElement;
+    if (!(parent instanceof HTMLElement)) {
+      setLiveEditorStatus("Could not resolve section container.", "error");
       return false;
     }
 
-    if (position === "above") {
-      await moveSelectedNodeInFlow("up");
+    const parentKey = parent.getAttribute("data-layout-key") || "";
+    if (!parentKey) {
+      setLiveEditorStatus("Section container lacks a layout key.", "error");
+      return false;
     }
 
-    setLiveEditorStatus(`Added section ${position === "above" ? "above" : "below"}.`, "success");
+    const template = liveSectionTemplateSelect instanceof HTMLSelectElement
+      ? (liveSectionTemplateSelect.value || "blank")
+      : "blank";
+
+    if (template === "duplicate") {
+      setSelectedNode(sectionNode, sectionKey);
+      await duplicateSelectedNode();
+
+      if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+        setLiveEditorStatus("Could not create a new section.", "error");
+        return false;
+      }
+
+      if (position === "above") {
+        await moveSelectedNodeInFlow("up");
+      }
+
+      setLiveEditorStatus(`Added duplicated section ${position === "above" ? "above" : "below"}.`, "success");
+      return true;
+    }
+
+    const dupId = `${Date.now().toString(36)}${(++duplicateCounter).toString(36)}`;
+    const dupLayoutKey = `layout.dup.${dupId}`;
+    const titleKey = `custom.${dupId}.title`;
+    const bodyKey = `custom.${dupId}.body`;
+    const buttonKey = `custom.${dupId}.button`;
+    const qKey = `custom.${dupId}.question`;
+    const aKey = `custom.${dupId}.answer`;
+
+    const newSection = document.createElement("section");
+    newSection.setAttribute("data-dup-id", dupId);
+    newSection.setAttribute("data-layout-key", dupLayoutKey);
+
+    if (template === "story") {
+      newSection.className = "story reveal-alt";
+      newSection.innerHTML = `
+        <h2 data-i18n="${titleKey}">New story section</h2>
+        <p data-i18n="${bodyKey}">Share a meaningful story about this part of your website.</p>
+      `;
+    } else if (template === "cta") {
+      newSection.className = "cta reveal-alt";
+      newSection.innerHTML = `
+        <h2 data-i18n="${titleKey}">Ready to take the next step?</h2>
+        <p data-i18n="${bodyKey}">Add your call-to-action message here.</p>
+        <a href="#inquiry" class="btn btn-accent" data-i18n="${buttonKey}">Let’s talk</a>
+      `;
+    } else if (template === "faq") {
+      newSection.className = "faq reveal-alt";
+      newSection.innerHTML = `
+        <h2 data-i18n="${titleKey}">Frequently asked questions</h2>
+        <details open>
+          <summary data-i18n="${qKey}">What should visitors know first?</summary>
+          <p data-i18n="${aKey}">Add a concise and clear answer that helps your visitors quickly.</p>
+        </details>
+      `;
+    } else if (template === "quote") {
+      newSection.className = "quotes reveal-alt";
+      newSection.innerHTML = `
+        <h2 data-i18n="${titleKey}">What people say</h2>
+        <blockquote>
+          <p data-i18n="${bodyKey}">“Replace this with a testimonial or a quote.”</p>
+          <cite>Client Name</cite>
+        </blockquote>
+      `;
+    } else {
+      newSection.className = "story reveal-alt";
+      newSection.innerHTML = `
+        <h2 data-i18n="${titleKey}">New section title</h2>
+        <p data-i18n="${bodyKey}">Write your content here.</p>
+      `;
+    }
+
+    if (position === "above") {
+      parent.insertBefore(newSection, sectionNode);
+    } else {
+      parent.insertBefore(newSection, sectionNode.nextSibling);
+    }
+
+    const htmlKey = `dup.node.${dupId}.html`;
+    const parentKeyStore = `dup.node.${dupId}.parent`;
+    const afterKeyStore = `dup.node.${dupId}.after`;
+    const placeKeyStore = `dup.node.${dupId}.place`;
+
+    const previousSibling = newSection.previousElementSibling;
+    const previousSiblingKey = previousSibling instanceof HTMLElement
+      ? (previousSibling.getAttribute("data-layout-key") || "")
+      : "";
+    const placeValue = previousSiblingKey ? "" : "start";
+
+    await saveLiveOverride({ key: htmlKey, value: newSection.outerHTML, type: "text", language: "all" });
+    await saveLiveOverride({ key: parentKeyStore, value: parentKey, type: "text", language: "all" });
+    await saveLiveOverride({ key: afterKeyStore, value: previousSiblingKey, type: "text", language: "all" });
+    if (placeValue) {
+      await saveLiveOverride({ key: placeKeyStore, value: placeValue, type: "text", language: "all" });
+    }
+
+    if (!siteContentOverrides.textByKey[htmlKey]) siteContentOverrides.textByKey[htmlKey] = {};
+    if (!siteContentOverrides.textByKey[parentKeyStore]) siteContentOverrides.textByKey[parentKeyStore] = {};
+    if (!siteContentOverrides.textByKey[afterKeyStore]) siteContentOverrides.textByKey[afterKeyStore] = {};
+    siteContentOverrides.textByKey[htmlKey].all = newSection.outerHTML;
+    siteContentOverrides.textByKey[parentKeyStore].all = parentKey;
+    siteContentOverrides.textByKey[afterKeyStore].all = previousSiblingKey;
+
+    if (placeValue) {
+      if (!siteContentOverrides.textByKey[placeKeyStore]) siteContentOverrides.textByKey[placeKeyStore] = {};
+      siteContentOverrides.textByKey[placeKeyStore].all = placeValue;
+    } else if (siteContentOverrides.textByKey[placeKeyStore]) {
+      delete siteContentOverrides.textByKey[placeKeyStore];
+    }
+
+    await persistParentChildOrder(parent);
+    wireLiveEditableNodes();
+    setSelectedNode(newSection, dupLayoutKey);
+    setLiveEditorStatus(`Added ${template} section ${position === "above" ? "above" : "below"}.`, "success");
     return true;
   };
 
@@ -2293,14 +2423,17 @@
       const htmlKey = `dup.node.${dupId}.html`;
       const parentKeyStore = `dup.node.${dupId}.parent`;
       const afterKeyStore = `dup.node.${dupId}.after`;
+      const placeKeyStore = `dup.node.${dupId}.place`;
 
       await deleteLiveOverride({ key: htmlKey, type: "text", language: "all" });
       await deleteLiveOverride({ key: parentKeyStore, type: "text", language: "all" });
       await deleteLiveOverride({ key: afterKeyStore, type: "text", language: "all" });
+      await deleteLiveOverride({ key: placeKeyStore, type: "text", language: "all" });
 
       delete siteContentOverrides.textByKey[htmlKey];
       delete siteContentOverrides.textByKey[parentKeyStore];
       delete siteContentOverrides.textByKey[afterKeyStore];
+      delete siteContentOverrides.textByKey[placeKeyStore];
 
       selectedNode.remove();
       setSelectedNode(null, "");
@@ -3579,6 +3712,12 @@
     });
   }
 
+  if (liveSectionTemplateSelect instanceof HTMLSelectElement) {
+    liveSectionTemplateSelect.addEventListener("change", () => {
+      setLiveEditorStatus(`Section template: ${liveSectionTemplateSelect.value}`, "info");
+    });
+  }
+
   if (liveMinimapStage instanceof HTMLElement) {
     const onMinimapPointerMove = (event) => {
       if (!minimapPointerDown) return;
@@ -3738,6 +3877,21 @@
 
       if (elementAction === "upload-image") {
         await uploadSelectedElementImageFromPanel();
+        return;
+      }
+
+      if (elementAction === "add-section-above") {
+        await addSectionNearSelected("above");
+        return;
+      }
+
+      if (elementAction === "add-section-below") {
+        await addSectionNearSelected("below");
+        return;
+      }
+
+      if (elementAction === "remove-section") {
+        await removeSelectedSection();
         return;
       }
 
