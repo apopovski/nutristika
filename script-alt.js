@@ -963,6 +963,9 @@
       <button type="button" class="key-inspector__toggle" data-live-action="hide-selected">Hide selected</button>
       <button type="button" class="key-inspector__toggle" data-live-action="show-selected">Show selected</button>
     </div>
+    <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-drag-scope" data-mode="child">Move: Child element</button>
+    </div>
     <label class="key-inspector__hint" for="live-slider-width">Hero slider width</label>
     <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
     <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
@@ -974,6 +977,7 @@
   let selectedNodeKey = "";
   let selectedNode = null;
   let suppressLiveClickUntil = 0;
+  let dragScopeMode = "child";
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1036,6 +1040,31 @@
     });
   };
 
+  const updateDragScopeButton = () => {
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-drag-scope"]');
+    if (!(button instanceof HTMLElement)) return;
+
+    const isChild = dragScopeMode === "child";
+    button.setAttribute("data-mode", dragScopeMode);
+    button.setAttribute("data-active", String(isChild));
+    button.textContent = isChild ? "Move: Child element" : "Move: Parent layer";
+  };
+
+  const resolveDragTargetNode = (target) => {
+    const exactNode = getInspectorNode(target);
+    if (!exactNode) return null;
+
+    if (dragScopeMode === "parent") {
+      if (exactNode.hasAttribute("data-layout-key")) {
+        return exactNode;
+      }
+
+      return exactNode.closest("[data-layout-key]") || exactNode;
+    }
+
+    return exactNode;
+  };
+
   const saveLayoutTranslate = async (key, el) => {
     if (!(el instanceof HTMLElement) || !key) return;
 
@@ -1096,8 +1125,8 @@
       if (liveEditorRoot.contains(downEvent.target)) return;
       if (downEvent.button !== 0) return;
 
-      const exactNode = getInspectorNode(downEvent.target);
-      if (exactNode && exactNode !== el) return;
+      const dragNode = resolveDragTargetNode(downEvent.target);
+      if (dragNode && dragNode !== el) return;
 
       downEvent.preventDefault();
       downEvent.stopPropagation();
@@ -1173,6 +1202,7 @@
     document.body.classList.add(`live-editor-vp-${liveEditorViewport}`);
     updateViewportButtons();
     updateVisibilityButtons();
+    updateDragScopeButton();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -1254,6 +1284,18 @@
         scheduleAutosaveFlush();
       }
       setLiveEditorStatus(`Autosave ${autosaveEnabled ? "enabled" : "disabled"}.`, "info");
+      return;
+    }
+
+    if (action === "toggle-drag-scope") {
+      dragScopeMode = dragScopeMode === "child" ? "parent" : "child";
+      updateDragScopeButton();
+      setLiveEditorStatus(
+        dragScopeMode === "child"
+          ? "Drag mode: moving child element"
+          : "Drag mode: moving parent layer",
+        "info"
+      );
       return;
     }
 
