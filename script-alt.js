@@ -916,6 +916,7 @@
 
   const renderLiveActionHistory = () => {
     const list = liveEditorRoot.querySelector(".live-editor-history__list");
+    const clearButton = liveEditorRoot.querySelector('[data-history-action="clear-reverted"]');
     if (!(list instanceof HTMLElement)) return;
 
     list.innerHTML = "";
@@ -923,6 +924,10 @@
     const filtered = liveActionHistoryFilter === "all"
       ? liveActionHistory
       : liveActionHistory.filter((entry) => entry.category === liveActionHistoryFilter);
+
+    if (clearButton instanceof HTMLButtonElement) {
+      clearButton.disabled = !liveActionHistory.some((entry) => entry.reverted);
+    }
 
     if (!filtered.length) {
       const empty = document.createElement("li");
@@ -1078,7 +1083,10 @@
     <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
     <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
     <div class="live-editor-history">
-      <p class="live-editor-history__title">Recent actions</p>
+      <div class="live-editor-history__head">
+        <p class="live-editor-history__title">Recent actions</p>
+        <button type="button" class="live-editor-history__clear" data-history-action="clear-reverted">Clear reverted</button>
+      </div>
       <div class="live-editor-history__filters" role="group" aria-label="History filters">
         <button type="button" class="live-editor-history__filter" data-history-filter="all" aria-pressed="true">All</button>
         <button type="button" class="live-editor-history__filter" data-history-filter="position" aria-pressed="false">Position</button>
@@ -1557,6 +1565,23 @@
   liveEditorRoot.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    if (target.getAttribute("data-history-action") === "clear-reverted") {
+      const before = liveActionHistory.length;
+      const kept = liveActionHistory.filter((entry) => !entry.reverted);
+      const removed = before - kept.length;
+
+      if (!removed) {
+        setLiveEditorStatus("No reverted actions to clear.", "info");
+        return;
+      }
+
+      liveActionHistory.length = 0;
+      liveActionHistory.push(...kept);
+      renderLiveActionHistory();
+      setLiveEditorStatus(`Cleared ${removed} reverted action${removed === 1 ? "" : "s"}.`, "success");
+      return;
+    }
 
     const historyFilter = target.getAttribute("data-history-filter");
     if (historyFilter === "all" || historyFilter === "position" || historyFilter === "visibility" || historyFilter === "content") {
