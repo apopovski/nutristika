@@ -1946,13 +1946,97 @@ body.live-editor-enabled.live-editor-panel-compact .live-editor-history {
   border-radius: 9px;
   background: #fff;
   color: #1d1d1d;
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
   font-family: "Space Grotesk", system-ui, sans-serif;
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  padding: 0.38rem 0.28rem;
+  padding: 0.34rem 0.28rem 0.32rem;
   cursor: pointer;
+}
+
+.live-section-template-btn__label {
+  line-height: 1;
+}
+
+.live-section-template-btn__icon {
+  width: 28px;
+  height: 20px;
+  border: 1px solid rgba(17, 17, 17, 0.24);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fbfffb 0%, #f2f7f4 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.live-section-template-btn__icon::before,
+.live-section-template-btn__icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(22, 106, 69, 0.5);
+}
+
+.live-section-template-btn__icon::before {
+  top: 5px;
+}
+
+.live-section-template-btn__icon::after {
+  top: 10px;
+}
+
+.live-section-template-btn__icon--blank::before,
+.live-section-template-btn__icon--blank::after {
+  background: rgba(17, 17, 17, 0.35);
+}
+
+.live-section-template-btn__icon--story::after {
+  right: 8px;
+}
+
+.live-section-template-btn__icon--cta::after {
+  top: 13px;
+  left: 8px;
+  right: 8px;
+  background: rgba(255, 143, 43, 0.72);
+}
+
+.live-section-template-btn__icon--faq::before,
+.live-section-template-btn__icon--faq::after {
+  left: 6px;
+  right: 6px;
+}
+
+.live-section-template-btn__icon--quote::before {
+  left: 8px;
+  right: 8px;
+  top: 6px;
+}
+
+.live-section-template-btn__icon--quote::after {
+  left: 10px;
+  right: 10px;
+  top: 11px;
+}
+
+.live-section-template-btn__icon--duplicate {
+  background: linear-gradient(180deg, #fefefe 0%, #f4f4f4 100%);
+}
+
+.live-section-template-btn__icon--duplicate::before {
+  left: 3px;
+  right: 9px;
+}
+
+.live-section-template-btn__icon--duplicate::after {
+  left: 9px;
+  right: 3px;
 }
 
 .live-section-template-btn:hover:not(:disabled) {

@@ -1411,12 +1411,30 @@
       <div class="live-element-editor__section" data-live-element-section="section">
         <p class="key-inspector__hint">Section tools</p>
         <div class="live-section-template-grid" role="group" aria-label="Section template picker">
-          <button type="button" class="live-section-template-btn" data-live-section-template="blank">Blank</button>
-          <button type="button" class="live-section-template-btn" data-live-section-template="story">Story</button>
-          <button type="button" class="live-section-template-btn" data-live-section-template="cta">CTA</button>
-          <button type="button" class="live-section-template-btn" data-live-section-template="faq">FAQ</button>
-          <button type="button" class="live-section-template-btn" data-live-section-template="quote">Quote</button>
-          <button type="button" class="live-section-template-btn" data-live-section-template="duplicate">Duplicate</button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="blank">
+            <span class="live-section-template-btn__icon live-section-template-btn__icon--blank" aria-hidden="true"></span>
+            <span class="live-section-template-btn__label">Blank</span>
+          </button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="story">
+            <span class="live-section-template-btn__icon live-section-template-btn__icon--story" aria-hidden="true"></span>
+            <span class="live-section-template-btn__label">Story</span>
+          </button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="cta">
+            <span class="live-section-template-btn__icon live-section-template-btn__icon--cta" aria-hidden="true"></span>
+            <span class="live-section-template-btn__label">CTA</span>
+          </button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="faq">
+            <span class="live-section-template-btn__icon live-section-template-btn__icon--faq" aria-hidden="true"></span>
+            <span class="live-section-template-btn__label">FAQ</span>
+          </button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="quote">
+            <span class="live-section-template-btn__icon live-section-template-btn__icon--quote" aria-hidden="true"></span>
+            <span class="live-section-template-btn__label">Quote</span>
+          </button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="duplicate">
+            <span class="live-section-template-btn__icon live-section-template-btn__icon--duplicate" aria-hidden="true"></span>
+            <span class="live-section-template-btn__label">Duplicate</span>
+          </button>
         </div>
         <label class="key-inspector__hint" for="live-section-template">New section type</label>
         <select id="live-section-template">
