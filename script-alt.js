@@ -1191,7 +1191,9 @@
       <button type="button" class="key-inspector__toggle" data-live-action="canvas-zoom" data-zoom="1">100%</button>
       <button type="button" class="key-inspector__toggle" data-live-action="canvas-zoom" data-zoom="fit">Fit</button>
     </div>
-    <p class="key-inspector__hint" data-live-canvas-zoom-label>Canvas zoom: 100%</p>
+    <label class="key-inspector__hint" for="live-canvas-zoom-range">Canvas zoom slider</label>
+    <input id="live-canvas-zoom-range" type="range" min="55" max="100" step="5" value="100" />
+    <p class="key-inspector__hint" data-live-canvas-zoom-label>Canvas zoom: 100% · ⌘/Ctrl +/-/0</p>
     <label class="key-inspector__hint" for="live-resolution-width">Custom preview width</label>
     <input id="live-resolution-width" type="range" min="320" max="1920" step="8" value="1280" />
     <p class="key-inspector__hint" data-live-resolution-label>Resolution: auto</p>
@@ -1249,6 +1251,7 @@
   const liveFontFamilyInput = liveEditorRoot.querySelector("#live-font-family");
   const liveFontSizeInput = liveEditorRoot.querySelector("#live-font-size");
   const liveFontSizeLabel = liveEditorRoot.querySelector("[data-live-font-size-label]");
+  const liveCanvasZoomInput = liveEditorRoot.querySelector("#live-canvas-zoom-range");
   const liveCanvasZoomLabel = liveEditorRoot.querySelector("[data-live-canvas-zoom-label]");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
@@ -1659,6 +1662,31 @@
     button.textContent = `Canvas mode: ${liveCanvasMode ? "On" : "Off"}`;
   };
 
+  const clampCanvasZoomPercent = (value) => Math.min(100, Math.max(55, value));
+
+  const normalizeCanvasZoomMode = (value) => {
+    if (value === "fit") return "fit";
+    const parsed = Number.parseFloat(String(value));
+    if (!Number.isFinite(parsed)) return "1";
+    const clamped = Math.min(1, Math.max(0.55, parsed));
+    return String(Math.round(clamped * 100) / 100);
+  };
+
+  const setCanvasZoomMode = (nextMode, { announce = false } = {}) => {
+    liveCanvasZoomMode = normalizeCanvasZoomMode(nextMode);
+    applyViewportProfileToBody();
+    updateCanvasZoomButtons();
+
+    if (!announce) return;
+
+    if (liveCanvasZoomMode === "fit") {
+      setLiveEditorStatus(`Canvas zoom set to Fit (${Math.round(liveCanvasZoom * 100)}%).`, "info");
+      return;
+    }
+
+    setLiveEditorStatus(`Canvas zoom set to ${Math.round(liveCanvasZoom * 100)}%.`, "info");
+  };
+
   const updateCanvasZoomButtons = () => {
     liveEditorRoot.querySelectorAll('[data-live-action="canvas-zoom"]').forEach((button) => {
       if (!(button instanceof HTMLElement)) return;
@@ -1668,14 +1696,19 @@
       button.setAttribute("aria-pressed", String(active));
     });
 
+    if (liveCanvasZoomInput instanceof HTMLInputElement) {
+      liveCanvasZoomInput.value = String(clampCanvasZoomPercent(Math.round(liveCanvasZoom * 100)));
+      liveCanvasZoomInput.disabled = liveCanvasZoomMode === "fit";
+    }
+
     if (!(liveCanvasZoomLabel instanceof HTMLElement)) return;
 
     if (liveCanvasZoomMode === "fit") {
-      liveCanvasZoomLabel.textContent = `Canvas zoom: Fit (${Math.round(liveCanvasZoom * 100)}%)`;
+      liveCanvasZoomLabel.textContent = `Canvas zoom: Fit (${Math.round(liveCanvasZoom * 100)}%) · ⌘/Ctrl +/-/0`;
       return;
     }
 
-    liveCanvasZoomLabel.textContent = `Canvas zoom: ${Math.round(liveCanvasZoom * 100)}%`;
+    liveCanvasZoomLabel.textContent = `Canvas zoom: ${Math.round(liveCanvasZoom * 100)}% · ⌘/Ctrl +/-/0`;
   };
 
   const updateSelectedTypographyControls = () => {
@@ -1963,10 +1996,22 @@
     liveResolutionInput.addEventListener("input", () => {
       liveEditorViewport = `w${liveResolutionInput.value}`;
       applyViewportProfileToBody();
+      updateCanvasZoomButtons();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
       updateSelectedTypographyControls();
+    });
+  }
+
+  if (liveCanvasZoomInput instanceof HTMLInputElement) {
+    liveCanvasZoomInput.addEventListener("input", () => {
+      const percent = clampCanvasZoomPercent(Number.parseInt(liveCanvasZoomInput.value, 10) || 100);
+      setCanvasZoomMode(String(percent / 100));
+    });
+
+    liveCanvasZoomInput.addEventListener("change", () => {
+      setLiveEditorStatus(`Canvas zoom set to ${Math.round(liveCanvasZoom * 100)}%.`, "info");
     });
   }
 
@@ -2091,6 +2136,7 @@
 
       liveEditorViewport = viewport;
       applyViewportProfileToBody();
+      updateCanvasZoomButtons();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
@@ -2104,6 +2150,7 @@
       if (!/^w\d{3,4}$/.test(profile)) return;
       liveEditorViewport = profile;
       applyViewportProfileToBody();
+      updateCanvasZoomButtons();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
@@ -2133,15 +2180,7 @@
     if (action === "canvas-zoom") {
       const zoom = target.getAttribute("data-zoom") || "";
       if (!(zoom === "fit" || /^(0\.75|0\.9|1)$/.test(zoom))) return;
-      liveCanvasZoomMode = zoom;
-      applyViewportProfileToBody();
-      updateCanvasZoomButtons();
-      setLiveEditorStatus(
-        zoom === "fit"
-          ? `Canvas zoom set to Fit (${Math.round(liveCanvasZoom * 100)}%).`
-          : `Canvas zoom set to ${Math.round(Number.parseFloat(zoom) * 100)}%.`,
-        "info"
-      );
+      setCanvasZoomMode(zoom, { announce: true });
       return;
     }
 
@@ -2595,6 +2634,30 @@
   }, true);
 
   document.addEventListener("keydown", (event) => {
+    if (liveEditorEnabled && (event.metaKey || event.ctrlKey) && !event.altKey) {
+      if (isTextInputContext(event.target)) return;
+
+      const key = event.key;
+      const isZoomIn = key === "+" || key === "=";
+      const isZoomOut = key === "-" || key === "_";
+      const isZoomReset = key === "0";
+
+      if (isZoomIn || isZoomOut || isZoomReset) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (isZoomReset) {
+          setCanvasZoomMode("1", { announce: true });
+          return;
+        }
+
+        const currentPercent = clampCanvasZoomPercent(Math.round(liveCanvasZoom * 100));
+        const nextPercent = clampCanvasZoomPercent(currentPercent + (isZoomIn ? 5 : -5));
+        setCanvasZoomMode(String(nextPercent / 100), { announce: true });
+        return;
+      }
+    }
+
     if (liveEditorEnabled && event.key.startsWith("Arrow")) {
       if (liveEditorRoot.contains(event.target)) return;
       if (isTextInputContext(event.target)) return;
@@ -2697,6 +2760,7 @@
 
     if (editorParam === "1" && liveEditorViewport === "auto") {
       applyViewportProfileToBody();
+      updateCanvasZoomButtons();
       updateViewportButtons();
       updateVisibilityButtons();
     }
