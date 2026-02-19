@@ -2096,6 +2096,32 @@ body.live-editor-enabled .footer {
   background: rgba(49, 164, 111, 0.22);
 }
 
+.live-editor-guide {
+  position: fixed;
+  z-index: 126;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.live-editor-guide.is-active {
+  opacity: 1;
+}
+
+.live-editor-guide--vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  border-left: 1px dashed rgba(255, 143, 43, 0.95);
+}
+
+.live-editor-guide--horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px dashed rgba(255, 143, 43, 0.95);
+}
+
 body.live-editor-enabled [data-i18n],
 body.live-editor-enabled [data-i18n-placeholder],
 body.live-editor-enabled [data-image-key],

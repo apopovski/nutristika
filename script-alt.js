@@ -1176,6 +1176,7 @@
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="mobile">Mobile</button>
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid">Grid: Off</button>
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-snap" data-active="false">Snap: Off</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-magnetic" data-active="false">Guides: Off</button>
     </div>
     <div class="live-editor-actions live-editor-actions--snap-sizes">
       <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="4">Snap 4</button>
@@ -1292,6 +1293,10 @@
   const liveEditorHudCopyButton = liveEditorHud.querySelector('[data-live-hud-action="copy-coords"]');
   const liveEditorHudResetButton = liveEditorHud.querySelector('[data-live-hud-action="reset-coords"]');
   const liveEditorHudVisibilityButton = liveEditorHud.querySelector('[data-live-hud-action="reset-visibility"]');
+  const liveEditorGuideVertical = document.createElement("div");
+  liveEditorGuideVertical.className = "live-editor-guide live-editor-guide--vertical";
+  const liveEditorGuideHorizontal = document.createElement("div");
+  liveEditorGuideHorizontal.className = "live-editor-guide live-editor-guide--horizontal";
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
@@ -1304,8 +1309,10 @@
   let liveCanvasZoom = 1;
   let liveCanvasZoomMode = "1";
   let liveSnapEnabled = false;
+  let liveMagneticGuidesEnabled = false;
   let minimapPointerDown = false;
   let liveSnapGridSize = 8;
+  const liveMagneticThreshold = 10;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1694,6 +1701,33 @@
     button.textContent = `Snap: ${liveSnapEnabled ? `On (${liveSnapGridSize}px)` : "Off"}`;
   };
 
+  const updateMagneticButton = () => {
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-magnetic"]');
+    if (!(button instanceof HTMLElement)) return;
+    button.setAttribute("data-active", String(liveMagneticGuidesEnabled));
+    button.textContent = `Guides: ${liveMagneticGuidesEnabled ? "On" : "Off"}`;
+  };
+
+  const setLiveGuideLine = (el, active, axis, position = 0) => {
+    if (!(el instanceof HTMLElement)) return;
+    if (!active) {
+      el.classList.remove("is-active");
+      return;
+    }
+
+    el.classList.add("is-active");
+    if (axis === "x") {
+      el.style.left = `${Math.round(position)}px`;
+    } else {
+      el.style.top = `${Math.round(position)}px`;
+    }
+  };
+
+  const clearLiveGuideLines = () => {
+    setLiveGuideLine(liveEditorGuideVertical, false, "x");
+    setLiveGuideLine(liveEditorGuideHorizontal, false, "y");
+  };
+
   const updateSnapSizeButtons = () => {
     liveEditorRoot.querySelectorAll('[data-live-action="snap-size"]').forEach((button) => {
       if (!(button instanceof HTMLElement)) return;
@@ -1993,6 +2027,95 @@
     let originX = 0;
     let originY = 0;
     let didMove = false;
+    let originRect = null;
+    let guideTargets = { x: [], y: [] };
+
+    const buildGuideTargets = () => {
+      if (!(el instanceof HTMLElement)) return { x: [], y: [] };
+
+      const candidates = [...document.querySelectorAll("[data-layout-key], [data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]")]
+        .filter((node) => node instanceof HTMLElement && node !== el && node.offsetParent !== null);
+
+      const x = [];
+      const y = [];
+      candidates.forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return;
+        x.push(rect.left, rect.left + rect.width / 2, rect.right);
+        y.push(rect.top, rect.top + rect.height / 2, rect.bottom);
+      });
+
+      return { x, y };
+    };
+
+    const resolveMagneticAlignment = (rawNextX, rawNextY, shiftKey) => {
+      if (!liveMagneticGuidesEnabled
+        || shiftKey
+        || !originRect
+        || !Number.isFinite(originRect.left)
+        || !Number.isFinite(originRect.top)) {
+        clearLiveGuideLines();
+        return {
+          nextX: rawNextX,
+          nextY: rawNextY,
+          snappedX: false,
+          snappedY: false
+        };
+      }
+
+      const deltaX = rawNextX - originX;
+      const deltaY = rawNextY - originY;
+      const candidateRect = {
+        left: originRect.left + deltaX,
+        right: originRect.right + deltaX,
+        top: originRect.top + deltaY,
+        bottom: originRect.bottom + deltaY,
+        centerX: originRect.left + (originRect.width / 2) + deltaX,
+        centerY: originRect.top + (originRect.height / 2) + deltaY
+      };
+
+      const xSources = [candidateRect.left, candidateRect.centerX, candidateRect.right];
+      const ySources = [candidateRect.top, candidateRect.centerY, candidateRect.bottom];
+
+      let bestXAdjust = null;
+      let bestXTarget = null;
+      guideTargets.x.forEach((target) => {
+        xSources.forEach((source) => {
+          const adjust = target - source;
+          if (Math.abs(adjust) > liveMagneticThreshold) return;
+          if (bestXAdjust === null || Math.abs(adjust) < Math.abs(bestXAdjust)) {
+            bestXAdjust = adjust;
+            bestXTarget = target;
+          }
+        });
+      });
+
+      let bestYAdjust = null;
+      let bestYTarget = null;
+      guideTargets.y.forEach((target) => {
+        ySources.forEach((source) => {
+          const adjust = target - source;
+          if (Math.abs(adjust) > liveMagneticThreshold) return;
+          if (bestYAdjust === null || Math.abs(adjust) < Math.abs(bestYAdjust)) {
+            bestYAdjust = adjust;
+            bestYTarget = target;
+          }
+        });
+      });
+
+      const nextX = rawNextX + (bestXAdjust || 0);
+      const nextY = rawNextY + (bestYAdjust || 0);
+
+      setLiveGuideLine(liveEditorGuideVertical, bestXTarget !== null, "x", bestXTarget || 0);
+      setLiveGuideLine(liveEditorGuideHorizontal, bestYTarget !== null, "y", bestYTarget || 0);
+
+      return {
+        nextX,
+        nextY,
+        snappedX: bestXAdjust !== null,
+        snappedY: bestYAdjust !== null
+      };
+    };
 
     const onMove = (moveEvent) => {
       const dx = moveEvent.clientX - startX;
@@ -2002,9 +2125,14 @@
       }
       const rawNextX = originX + dx;
       const rawNextY = originY + dy;
+      const aligned = resolveMagneticAlignment(rawNextX, rawNextY, moveEvent.shiftKey);
       const shouldSnap = liveSnapEnabled && !moveEvent.shiftKey;
-      const nextX = shouldSnap ? Math.round(rawNextX / liveSnapGridSize) * liveSnapGridSize : rawNextX;
-      const nextY = shouldSnap ? Math.round(rawNextY / liveSnapGridSize) * liveSnapGridSize : rawNextY;
+      const nextX = shouldSnap && !aligned.snappedX
+        ? Math.round(aligned.nextX / liveSnapGridSize) * liveSnapGridSize
+        : aligned.nextX;
+      const nextY = shouldSnap && !aligned.snappedY
+        ? Math.round(aligned.nextY / liveSnapGridSize) * liveSnapGridSize
+        : aligned.nextY;
       el.style.transform = `translate(${nextX}px, ${nextY}px)`;
       showLiveEditorHud({ key, x: nextX, y: nextY });
     };
@@ -2013,6 +2141,7 @@
       el.removeAttribute("data-dragging");
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      clearLiveGuideLines();
 
       if (didMove) {
         suppressLiveClickUntil = Date.now() + 260;
@@ -2041,6 +2170,9 @@
       const origin = getTranslateFromElement(el);
       originX = origin.x;
       originY = origin.y;
+      originRect = el.getBoundingClientRect();
+      guideTargets = buildGuideTargets();
+      clearLiveGuideLines();
 
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
@@ -2102,6 +2234,8 @@
   if (editorParam === "1") {
     document.body.appendChild(liveEditorRoot);
     document.body.appendChild(liveEditorHud);
+    document.body.appendChild(liveEditorGuideVertical);
+    document.body.appendChild(liveEditorGuideHorizontal);
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
@@ -2111,6 +2245,7 @@
     updateDragScopeButton();
     updateCanvasModeButton();
     updateSnapButton();
+    updateMagneticButton();
     updateSnapSizeButtons();
     updateCanvasZoomButtons();
     updateCanvasMinimap();
@@ -2359,6 +2494,21 @@
         liveSnapEnabled
           ? `Snap enabled (${liveSnapGridSize}px). Hold Shift while dragging to bypass.`
           : "Snap disabled.",
+        "info"
+      );
+      return;
+    }
+
+    if (action === "toggle-magnetic") {
+      liveMagneticGuidesEnabled = !liveMagneticGuidesEnabled;
+      if (!liveMagneticGuidesEnabled) {
+        clearLiveGuideLines();
+      }
+      updateMagneticButton();
+      setLiveEditorStatus(
+        liveMagneticGuidesEnabled
+          ? `Magnetic guides enabled (±${liveMagneticThreshold}px). Hold Shift while dragging to bypass.`
+          : "Magnetic guides disabled.",
         "info"
       );
       return;
