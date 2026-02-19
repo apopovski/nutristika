@@ -1834,6 +1834,37 @@
     });
   };
 
+  const getLiveSearchCandidateButtons = () => {
+    const selectors = [
+      ".key-inspector__toggle",
+      ".live-section-template-btn",
+      ".live-editor-history__filter",
+      ".live-editor-history__clear"
+    ];
+
+    return [...liveEditorRoot.querySelectorAll(selectors.join(","))]
+      .filter((node) => {
+        if (!(node instanceof HTMLButtonElement)) return false;
+        if (node.disabled) return false;
+        if (node.classList.contains("is-filter-hidden")) return false;
+        if (!node.offsetParent && !liveEditorRoot.classList.contains("is-collapsed")) return false;
+        return true;
+      });
+  };
+
+  const triggerFirstVisibleLiveSearchAction = () => {
+    const candidates = getLiveSearchCandidateButtons();
+    const first = candidates[0];
+    if (!(first instanceof HTMLButtonElement)) {
+      setLiveEditorStatus("No matching action for this search.", "info");
+      return false;
+    }
+
+    first.focus({ preventScroll: true });
+    first.click();
+    return true;
+  };
+
   const applyLiveEditorCollapsedState = () => {
     document.body.classList.toggle("live-editor-panel-collapsed", liveEditorCollapsed);
     liveEditorRoot.classList.toggle("is-collapsed", liveEditorCollapsed);
@@ -3834,6 +3865,22 @@
     liveActionSearchInput.addEventListener("input", () => {
       applyLiveActionSearchFilter(liveActionSearchInput.value);
     });
+
+    liveActionSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        triggerFirstVisibleLiveSearchAction();
+        return;
+      }
+
+      if (event.key === "Escape" && liveActionSearchInput.value) {
+        event.preventDefault();
+        liveActionSearchInput.value = "";
+        applyLiveActionSearchFilter("");
+        setLiveEditorStatus("Quick action search cleared.", "info");
+      }
+    });
   }
 
   if (liveSectionsNavigatorRoot instanceof HTMLElement && liveSectionsNavigatorList instanceof HTMLElement) {
@@ -4398,21 +4445,6 @@
 
       if (elementAction === "upload-image") {
         await uploadSelectedElementImageFromPanel();
-        return;
-      }
-
-      if (elementAction === "add-section-above") {
-        await addSectionNearSelected("above");
-        return;
-      }
-
-      if (elementAction === "add-section-below") {
-        await addSectionNearSelected("below");
-        return;
-      }
-
-      if (elementAction === "remove-section") {
-        await removeSelectedSection();
         return;
       }
 
