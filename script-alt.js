@@ -1175,6 +1175,7 @@
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="tablet">Tablet</button>
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="mobile">Mobile</button>
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid">Grid: Off</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-snap" data-active="false">Snap: Off</button>
     </div>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1728">MBP 16"</button>
@@ -1296,7 +1297,9 @@
   let liveCanvasMode = false;
   let liveCanvasZoom = 1;
   let liveCanvasZoomMode = "1";
+  let liveSnapEnabled = false;
   let minimapPointerDown = false;
+  const liveSnapGridSize = 8;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1678,6 +1681,13 @@
     button.textContent = `Canvas mode: ${liveCanvasMode ? "On" : "Off"}`;
   };
 
+  const updateSnapButton = () => {
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-snap"]');
+    if (!(button instanceof HTMLElement)) return;
+    button.setAttribute("data-active", String(liveSnapEnabled));
+    button.textContent = `Snap: ${liveSnapEnabled ? `On (${liveSnapGridSize}px)` : "Off"}`;
+  };
+
   const clampBetween = (value, min, max) => Math.min(max, Math.max(min, value));
 
   const updateCanvasMinimap = () => {
@@ -1974,8 +1984,11 @@
       if (!didMove && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
         didMove = true;
       }
-      const nextX = originX + dx;
-      const nextY = originY + dy;
+      const rawNextX = originX + dx;
+      const rawNextY = originY + dy;
+      const shouldSnap = liveSnapEnabled && !moveEvent.shiftKey;
+      const nextX = shouldSnap ? Math.round(rawNextX / liveSnapGridSize) * liveSnapGridSize : rawNextX;
+      const nextY = shouldSnap ? Math.round(rawNextY / liveSnapGridSize) * liveSnapGridSize : rawNextY;
       el.style.transform = `translate(${nextX}px, ${nextY}px)`;
       showLiveEditorHud({ key, x: nextX, y: nextY });
     };
@@ -2081,6 +2094,7 @@
     updateVisibilityButtons();
     updateDragScopeButton();
     updateCanvasModeButton();
+    updateSnapButton();
     updateCanvasZoomButtons();
     updateCanvasMinimap();
 
@@ -2317,6 +2331,18 @@
         target.textContent = `Grid: ${active ? "On" : "Off"}`;
       }
       setLiveEditorStatus(`Grid ${active ? "enabled" : "disabled"}`, "info");
+      return;
+    }
+
+    if (action === "toggle-snap") {
+      liveSnapEnabled = !liveSnapEnabled;
+      updateSnapButton();
+      setLiveEditorStatus(
+        liveSnapEnabled
+          ? `Snap enabled (${liveSnapGridSize}px). Hold Shift while dragging to bypass.`
+          : "Snap disabled.",
+        "info"
+      );
       return;
     }
 
