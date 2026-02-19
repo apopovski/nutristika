@@ -1379,10 +1379,13 @@
       <div class="live-editor-actions live-editor-actions--move">
         <button type="button" class="key-inspector__toggle" data-live-element-action="move-up">↑ Up</button>
         <button type="button" class="key-inspector__toggle" data-live-element-action="move-down">↓ Down</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="move-top">⇤ Top</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="move-bottom">⇥ Bottom</button>
         <button type="button" class="key-inspector__toggle" data-live-element-action="move-left">← Left</button>
         <button type="button" class="key-inspector__toggle" data-live-element-action="move-right">→ Right</button>
       </div>
       <div class="live-editor-actions">
+        <button type="button" class="key-inspector__toggle" data-live-element-action="normalize-spacing">Normalize spacing</button>
         <button type="button" class="key-inspector__toggle" data-live-element-action="toggle-visibility">Hide</button>
         <button type="button" class="key-inspector__toggle" data-live-element-action="duplicate">Duplicate</button>
         <button type="button" class="key-inspector__toggle" data-live-element-action="remove">Remove</button>
@@ -1833,7 +1836,7 @@
 
   const moveSelectedNodeInFlow = async (direction) => {
     if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) return false;
-    if (!(direction === "up" || direction === "down")) return false;
+    if (!["up", "down", "top", "bottom"].includes(direction)) return false;
 
     const parent = selectedNode.parentElement;
     if (!(parent instanceof HTMLElement)) return false;
@@ -1842,7 +1845,19 @@
     const index = siblings.indexOf(selectedNode);
     if (index < 0) return false;
 
-    if (direction === "up") {
+    if (direction === "top") {
+      if (index === 0) {
+        setLiveEditorStatus("Already at top of this group.", "info");
+        return true;
+      }
+      parent.insertBefore(selectedNode, siblings[0]);
+    } else if (direction === "bottom") {
+      if (index === siblings.length - 1) {
+        setLiveEditorStatus("Already at bottom of this group.", "info");
+        return true;
+      }
+      parent.appendChild(selectedNode);
+    } else if (direction === "up") {
       const previous = siblings[index - 1];
       if (!(previous instanceof HTMLElement)) {
         setLiveEditorStatus("Already at top of this group.", "info");
@@ -1868,6 +1883,44 @@
       `Moved ${selectedNodeKey} ${direction} in flow for auto spacing/alignment${persisted ? " (saved)" : ""}.`,
       "success"
     );
+    return true;
+  };
+
+  const normalizeSelectedParentSpacing = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) return false;
+
+    const parent = selectedNode.parentElement;
+    if (!(parent instanceof HTMLElement)) return false;
+
+    const profile = getActiveViewportProfile();
+    const siblings = [...parent.children].filter((child) => child instanceof HTMLElement);
+    let resetCount = 0;
+
+    for (const sibling of siblings) {
+      const key = sibling.getAttribute("data-layout-key") || "";
+      if (!key) continue;
+
+      const translateKey = `layout.${key}.translate.${profile}`;
+      sibling.style.transform = "translate(0px, 0px)";
+
+      await deleteLiveOverride({ key: translateKey, type: "text", language: "all" });
+
+      if (siteContentOverrides.textByKey[translateKey]) {
+        delete siteContentOverrides.textByKey[translateKey].all;
+        if (!Object.keys(siteContentOverrides.textByKey[translateKey]).length) {
+          delete siteContentOverrides.textByKey[translateKey];
+        }
+      }
+
+      resetCount += 1;
+    }
+
+    applyLayoutOverrides();
+    selectedNodeDetails = getInspectorDetails(selectedNode);
+    updateLiveElementEditorPanel();
+    updateLiveEditorQuickbarPosition();
+    updateLiveEditorSelectionOverlay();
+    setLiveEditorStatus(`Normalized spacing for ${resetCount} sibling layer${resetCount === 1 ? "" : "s"} on ${profile}.`, "success");
     return true;
   };
 
@@ -3523,6 +3576,20 @@
         return;
       }
 
+      if (elementAction === "move-top") {
+        if (!await moveSelectedNodeInFlow("top")) {
+          setLiveEditorStatus("Move to top is unavailable for this selection.", "info");
+        }
+        return;
+      }
+
+      if (elementAction === "move-bottom") {
+        if (!await moveSelectedNodeInFlow("bottom")) {
+          setLiveEditorStatus("Move to bottom is unavailable for this selection.", "info");
+        }
+        return;
+      }
+
       if (elementAction === "move-left") {
         nudgeSelectedNode(-liveSnapGridSize, 0);
         return;
@@ -3535,6 +3602,13 @@
 
       if (elementAction === "duplicate") {
         await duplicateSelectedNode();
+        return;
+      }
+
+      if (elementAction === "normalize-spacing") {
+        if (!await normalizeSelectedParentSpacing()) {
+          setLiveEditorStatus("Normalize spacing is unavailable for this selection.", "info");
+        }
         return;
       }
 
