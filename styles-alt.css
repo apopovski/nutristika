@@ -1935,6 +1935,42 @@ body.live-editor-enabled.live-editor-panel-compact .live-editor-history {
   padding-top: 0.38rem;
 }
 
+.live-section-template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+
+.live-section-template-btn {
+  border: 1.5px solid rgba(17, 17, 17, 0.22);
+  border-radius: 9px;
+  background: #fff;
+  color: #1d1d1d;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.38rem 0.28rem;
+  cursor: pointer;
+}
+
+.live-section-template-btn:hover:not(:disabled) {
+  border-color: rgba(22, 106, 69, 0.46);
+  background: #f2fbf6;
+}
+
+.live-section-template-btn[data-active="true"] {
+  border-color: #114f34;
+  background: #114f34;
+  color: #fff;
+}
+
+.live-section-template-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .live-element-editor__section.is-hidden {
   display: none;
 }

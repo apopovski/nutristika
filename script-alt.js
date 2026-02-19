@@ -1410,6 +1410,14 @@
       </div>
       <div class="live-element-editor__section" data-live-element-section="section">
         <p class="key-inspector__hint">Section tools</p>
+        <div class="live-section-template-grid" role="group" aria-label="Section template picker">
+          <button type="button" class="live-section-template-btn" data-live-section-template="blank">Blank</button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="story">Story</button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="cta">CTA</button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="faq">FAQ</button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="quote">Quote</button>
+          <button type="button" class="live-section-template-btn" data-live-section-template="duplicate">Duplicate</button>
+        </div>
         <label class="key-inspector__hint" for="live-section-template">New section type</label>
         <select id="live-section-template">
           <option value="blank">Blank section</option>
@@ -1481,6 +1489,8 @@
   const liveElementTextInput = liveEditorRoot.querySelector("#live-element-text");
   const liveElementImageUrlInput = liveEditorRoot.querySelector("#live-element-image-url");
   const liveSectionTemplateSelect = liveEditorRoot.querySelector("#live-section-template");
+  const liveSectionTemplateButtons = [...liveEditorRoot.querySelectorAll("[data-live-section-template]")]
+    .filter((button) => button instanceof HTMLButtonElement);
   const liveSectionHeightInput = liveEditorRoot.querySelector("#live-section-height");
   const liveSectionHeightLabel = liveEditorRoot.querySelector("[data-live-section-height-label]");
   const liveEditorHud = document.createElement("div");
@@ -1801,6 +1811,18 @@
     if (liveSectionTemplateSelect instanceof HTMLSelectElement) {
       liveSectionTemplateSelect.disabled = !canEditSection;
     }
+
+    liveSectionTemplateButtons.forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      button.disabled = !canEditSection;
+      const value = button.getAttribute("data-live-section-template") || "";
+      const activeValue = liveSectionTemplateSelect instanceof HTMLSelectElement
+        ? liveSectionTemplateSelect.value
+        : "blank";
+      const active = value === activeValue;
+      button.setAttribute("data-active", String(active));
+      button.setAttribute("aria-pressed", String(active));
+    });
 
     if (liveSectionHeightInput instanceof HTMLInputElement) {
       liveSectionHeightInput.disabled = !canEditSection;
@@ -3715,6 +3737,24 @@
   if (liveSectionTemplateSelect instanceof HTMLSelectElement) {
     liveSectionTemplateSelect.addEventListener("change", () => {
       setLiveEditorStatus(`Section template: ${liveSectionTemplateSelect.value}`, "info");
+      updateLiveElementEditorPanel();
+    });
+  }
+
+  if (liveElementEditorRoot instanceof HTMLElement) {
+    liveElementEditorRoot.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const template = target.getAttribute("data-live-section-template") || "";
+      if (!template || !(liveSectionTemplateSelect instanceof HTMLSelectElement)) return;
+
+      if (liveSectionTemplateSelect.value !== template) {
+        liveSectionTemplateSelect.value = template;
+        setLiveEditorStatus(`Section template: ${template}`, "info");
+      }
+
+      updateLiveElementEditorPanel();
     });
   }
 
