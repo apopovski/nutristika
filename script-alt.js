@@ -1303,9 +1303,9 @@
   liveEditorRoot.className = "key-inspector live-editor-panel";
   liveEditorRoot.innerHTML = `
     <div class="live-editor-rail" data-live-rail>
-      <button type="button" class="key-inspector__toggle" data-live-action="toggle-collapse" data-live-search-pin="true">Collapse</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="save-now" data-live-search-pin="true">Save</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="undo" data-live-search-pin="true">Undo</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-collapse" data-live-search-pin="true" data-tooltip="Collapse editor" aria-label="Collapse editor">◀</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="save-now" data-live-search-pin="true" data-tooltip="Save changes" aria-label="Save changes">💾</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="undo" data-live-search-pin="true" data-tooltip="Undo last action" aria-label="Undo last action">↶</button>
     </div>
     <p class="key-inspector__hint"><strong>Live Editor</strong> — click text/image to edit instantly.</p>
     <div class="live-editor-actions">
@@ -1841,7 +1841,9 @@
     const button = liveEditorRoot.querySelector('[data-live-action="toggle-collapse"]');
     if (button instanceof HTMLElement) {
       button.setAttribute("data-active", String(liveEditorCollapsed));
-      button.textContent = liveEditorCollapsed ? "Expand" : "Collapse";
+      button.textContent = liveEditorCollapsed ? "▶" : "◀";
+      button.setAttribute("data-tooltip", liveEditorCollapsed ? "Expand editor" : "Collapse editor");
+      button.setAttribute("aria-label", liveEditorCollapsed ? "Expand editor" : "Collapse editor");
     }
   };
 
