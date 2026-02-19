@@ -713,6 +713,7 @@
   const LIVE_EDITOR_COLLAPSED_KEY = "nutristika-live-editor-collapsed";
   const LIVE_EDITOR_PANEL_OPACITY_KEY = "nutristika-live-editor-panel-opacity";
   const LIVE_EDITOR_BEGINNER_KEY = "nutristika-live-editor-beginner";
+  const LIVE_EDITOR_COMMAND_RECENT_KEY = "nutristika-live-editor-command-recent";
   const params = new URLSearchParams(window.location.search);
   const inspectorParam = params.get("inspector");
   const editorParam = params.get("editor");
@@ -1645,6 +1646,15 @@
   let liveEditorCommandOpen = false;
   let liveEditorCommandActiveIndex = 0;
   let liveEditorCommandFilteredActions = [];
+  let liveEditorCommandRecent = (() => {
+    try {
+      const raw = localStorage.getItem(LIVE_EDITOR_COMMAND_RECENT_KEY) || "";
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  })();
   let selectedNodeDetails = null;
   const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
   let liveEditorPanelOpacity = Number.isFinite(savedPanelOpacityRaw)
@@ -1880,6 +1890,39 @@
     return true;
   };
 
+  const persistLiveCommandRecent = () => {
+    try {
+      localStorage.setItem(LIVE_EDITOR_COMMAND_RECENT_KEY, JSON.stringify(liveEditorCommandRecent));
+    } catch {
+      // Ignore storage quota and serialization edge cases.
+    }
+  };
+
+  const recordLiveCommandUsage = (commandId) => {
+    if (!commandId) return;
+    const now = Date.now();
+    const current = liveEditorCommandRecent?.[commandId];
+    const count = Number.isFinite(Number(current?.count)) ? Number(current.count) : 0;
+    liveEditorCommandRecent[commandId] = {
+      count: Math.min(999, count + 1),
+      lastUsedAt: now
+    };
+
+    const entries = Object.entries(liveEditorCommandRecent || {})
+      .filter(([, value]) => value && typeof value === "object")
+      .sort((a, b) => {
+        const aTime = Number(a?.[1]?.lastUsedAt || 0);
+        const bTime = Number(b?.[1]?.lastUsedAt || 0);
+        return bTime - aTime;
+      });
+
+    if (entries.length > 160) {
+      liveEditorCommandRecent = Object.fromEntries(entries.slice(0, 160));
+    }
+
+    persistLiveCommandRecent();
+  };
+
   const getLiveCommandActionItems = () => {
     const resolveCommandCategory = ({ liveAction, elementAction, sectionAction, batchAction, templateAction, historyFilter, historyAction }) => {
       if (elementAction) return "Element";
@@ -1906,6 +1949,17 @@
         .replace(/[-_]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
+    };
+
+    const resolveCommandShortcut = ({ liveAction, dataZoom }) => {
+      if (liveAction === "save-now") return "⌘/Ctrl+S";
+      if (liveAction === "toggle-collapse") return "⌘/Ctrl+E";
+      if (liveAction === "duplicate-selected") return "⌘/Ctrl+D";
+      if (liveAction === "canvas-zoom") {
+        if (dataZoom === "1") return "⌘/Ctrl+0";
+        return "⌘/Ctrl +/-/0";
+      }
+      return "";
     };
 
     const actionButtons = [...liveEditorRoot.querySelectorAll("button")]
@@ -1935,6 +1989,24 @@
         const templateAction = button.getAttribute("data-live-section-template") || "";
         const historyFilter = button.getAttribute("data-history-filter") || "";
         const historyAction = button.getAttribute("data-history-action") || "";
+        const dataViewport = button.getAttribute("data-viewport") || "";
+        const dataDock = button.getAttribute("data-dock") || "";
+        const dataSize = button.getAttribute("data-size") || "";
+        const dataZoom = button.getAttribute("data-zoom") || "";
+        const commandId = [
+          liveAction,
+          elementAction,
+          sectionAction,
+          batchAction,
+          templateAction,
+          historyFilter,
+          historyAction,
+          dataViewport,
+          dataDock,
+          dataSize,
+          dataZoom,
+          label
+        ].join("|");
         const key = `${label}|${liveAction}|${elementAction}|${sectionAction}|${batchAction}|${templateAction}|${historyFilter}|${historyAction}`;
 
         const category = resolveCommandCategory({
@@ -1957,12 +2029,21 @@
           historyAction
         });
 
+        const shortcut = resolveCommandShortcut({ liveAction, dataZoom });
+        const usage = liveEditorCommandRecent?.[commandId] || {};
+        const usageCount = Number.isFinite(Number(usage?.count)) ? Number(usage.count) : 0;
+        const lastUsedAt = Number.isFinite(Number(usage?.lastUsedAt)) ? Number(usage.lastUsedAt) : 0;
+
         return {
           key,
+          commandId,
           label: label || "Action",
           searchable: `${label} ${liveAction} ${elementAction} ${sectionAction} ${batchAction} ${templateAction} ${historyFilter} ${historyAction}`.toLowerCase(),
           category,
           meta,
+          shortcut,
+          usageCount,
+          lastUsedAt,
           button
         };
       })
@@ -1976,11 +2057,19 @@
 
   const scoreLiveCommandItem = (item, rawQuery) => {
     const query = String(rawQuery || "").trim().toLowerCase();
-    if (!query) return 1;
-
     const label = String(item?.label || "").toLowerCase();
     const searchable = String(item?.searchable || "").toLowerCase();
-    let score = 0;
+    const usageCount = Number.isFinite(Number(item?.usageCount)) ? Number(item.usageCount) : 0;
+    const lastUsedAt = Number.isFinite(Number(item?.lastUsedAt)) ? Number(item.lastUsedAt) : 0;
+    const usageBoost = Math.min(90, usageCount * 9);
+    const ageHours = lastUsedAt > 0 ? Math.max(0, (Date.now() - lastUsedAt) / (1000 * 60 * 60)) : Number.POSITIVE_INFINITY;
+    const freshnessBoost = Number.isFinite(ageHours) ? Math.max(0, 28 - (ageHours * 0.35)) : 0;
+
+    if (!query) {
+      return 1 + usageBoost + freshnessBoost;
+    }
+
+    let score = usageBoost + freshnessBoost;
 
     if (label.startsWith(query)) score += 120;
     if (label.includes(query)) score += 70;
@@ -2043,6 +2132,7 @@
       return false;
     }
 
+    recordLiveCommandUsage(item.commandId || item.key || "");
     item.button.click();
     return true;
   };
@@ -2060,7 +2150,14 @@
           return a.item.label.localeCompare(b.item.label);
         })
         .map((entry) => entry.item)
-      : all;
+      : all
+        .slice()
+        .sort((a, b) => {
+          const aScore = scoreLiveCommandItem(a, "");
+          const bScore = scoreLiveCommandItem(b, "");
+          if (bScore !== aScore) return bScore - aScore;
+          return a.label.localeCompare(b.label);
+        });
 
     liveEditorCommandList.innerHTML = "";
 
@@ -2092,8 +2189,20 @@
       category.className = "live-editor-command__item-category";
       category.textContent = item.category || "Actions";
 
+      const right = document.createElement("span");
+      right.className = "live-editor-command__item-right";
+
+      if (item.shortcut) {
+        const shortcut = document.createElement("span");
+        shortcut.className = "live-editor-command__item-shortcut";
+        shortcut.textContent = item.shortcut;
+        right.appendChild(shortcut);
+      }
+
+      right.appendChild(category);
+
       main.appendChild(label);
-      main.appendChild(category);
+      main.appendChild(right);
 
       const meta = document.createElement("span");
       meta.className = "live-editor-command__item-meta";

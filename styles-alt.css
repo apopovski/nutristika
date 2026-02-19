@@ -3335,6 +3335,13 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   gap: 0.45rem;
 }
 
+.live-editor-command__item-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  flex-shrink: 0;
+}
+
 .live-editor-command__item-label {
   display: block;
   font-size: 0.68rem;
@@ -3365,6 +3372,18 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   flex-shrink: 0;
 }
 
+.live-editor-command__item-shortcut {
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 7px;
+  background: rgba(17, 17, 17, 0.06);
+  color: #2d3a34;
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 0.18rem 0.28rem;
+}
+
 .live-editor-command__item:hover,
 .live-editor-command__item[data-active="true"] {
   border-color: rgba(22, 106, 69, 0.42);
@@ -3376,6 +3395,13 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
 .live-editor-command__item[data-active="true"] .live-editor-command__item-category {
   border-color: rgba(22, 106, 69, 0.42);
   background: rgba(22, 106, 69, 0.12);
+  color: #114f34;
+}
+
+.live-editor-command__item:hover .live-editor-command__item-shortcut,
+.live-editor-command__item[data-active="true"] .live-editor-command__item-shortcut {
+  border-color: rgba(22, 106, 69, 0.34);
+  background: rgba(22, 106, 69, 0.08);
   color: #114f34;
 }
 
