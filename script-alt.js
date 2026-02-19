@@ -978,10 +978,12 @@
   liveEditorHud.innerHTML = `
     <p class="live-editor-hud__key">No selection</p>
     <p class="live-editor-hud__coords">x: 0 · y: 0</p>
+    <button type="button" class="live-editor-hud__copy" data-live-hud-action="copy-coords">Copy coords</button>
   `;
 
   const liveEditorHudKey = liveEditorHud.querySelector(".live-editor-hud__key");
   const liveEditorHudCoords = liveEditorHud.querySelector(".live-editor-hud__coords");
+  const liveEditorHudCopyButton = liveEditorHud.querySelector('[data-live-hud-action="copy-coords"]');
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
@@ -1021,6 +1023,48 @@
       hudHideTimer = null;
       liveEditorHud.classList.remove("is-visible");
     }, delay);
+  };
+
+  const copySelectedCoords = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Select an element first to copy coordinates.", "info");
+      return;
+    }
+
+    const { x, y } = getTranslateFromElement(selectedNode);
+    const payload = `${x},${y}`;
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      setLiveEditorStatus(`Copied coords for ${selectedNodeKey}: ${payload}`, "success");
+      showLiveEditorHud({ key: selectedNodeKey, x, y });
+      hideLiveEditorHudSoon(1800);
+      return;
+    } catch {
+      try {
+        const temp = document.createElement("textarea");
+        temp.value = payload;
+        temp.setAttribute("readonly", "");
+        temp.style.position = "fixed";
+        temp.style.opacity = "0";
+        document.body.appendChild(temp);
+        temp.focus();
+        temp.select();
+        const copied = document.execCommand("copy");
+        temp.remove();
+
+        if (copied) {
+          setLiveEditorStatus(`Copied coords for ${selectedNodeKey}: ${payload}`, "success");
+          showLiveEditorHud({ key: selectedNodeKey, x, y });
+          hideLiveEditorHudSoon(1800);
+          return;
+        }
+      } catch {
+        // no-op
+      }
+    }
+
+    setLiveEditorStatus("Could not copy coordinates. Try again.", "error");
   };
 
   const setSelectedNode = (node, key) => {
@@ -1197,6 +1241,7 @@
     el.addEventListener("pointerdown", (downEvent) => {
       if (!liveEditorEnabled) return;
       if (liveEditorRoot.contains(downEvent.target)) return;
+      if (liveEditorHud.contains(downEvent.target)) return;
       if (downEvent.button !== 0) return;
 
       const dragNode = resolveDragTargetNode(downEvent.target);
@@ -1287,6 +1332,12 @@
     }
 
     wireLiveEditableNodes();
+  }
+
+  if (liveEditorHudCopyButton instanceof HTMLButtonElement) {
+    liveEditorHudCopyButton.addEventListener("click", () => {
+      void copySelectedCoords();
+    });
   }
 
   if (liveWidthInput instanceof HTMLInputElement) {
@@ -1572,7 +1623,7 @@
         return;
       }
 
-      if (liveEditorRoot.contains(event.target) || inspectorRoot.contains(event.target)) return;
+      if (liveEditorRoot.contains(event.target) || liveEditorHud.contains(event.target) || inspectorRoot.contains(event.target)) return;
 
       const node = getInspectorNode(event.target);
       if (!node) return;

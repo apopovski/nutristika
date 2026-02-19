@@ -1765,7 +1765,9 @@ body.inspector-enabled [data-layout-key] {
   padding: 0.48rem 0.62rem;
   opacity: 0;
   transform: translateY(-8px) scale(0.98);
-  pointer-events: none;
+  pointer-events: auto;
+  display: grid;
+  gap: 0.22rem;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
@@ -1789,6 +1791,26 @@ body.inspector-enabled [data-layout-key] {
   font-size: 0.75rem;
   font-weight: 700;
   color: #d8ff57;
+}
+
+.live-editor-hud__copy {
+  margin-top: 0.2rem;
+  border: 1.5px solid rgba(216, 255, 87, 0.85);
+  border-radius: 999px;
+  background: rgba(216, 255, 87, 0.12);
+  color: #f1ffd7;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.34rem 0.52rem;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.live-editor-hud__copy:hover {
+  background: rgba(216, 255, 87, 0.2);
 }
 
 body.live-editor-enabled [data-i18n],
