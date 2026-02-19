@@ -1185,6 +1185,13 @@
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-canvas" data-active="false">Canvas mode: Off</button>
     </div>
+    <div class="live-editor-actions live-editor-actions--zoom">
+      <button type="button" class="key-inspector__toggle" data-live-action="canvas-zoom" data-zoom="0.75">75%</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="canvas-zoom" data-zoom="0.9">90%</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="canvas-zoom" data-zoom="1">100%</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="canvas-zoom" data-zoom="fit">Fit</button>
+    </div>
+    <p class="key-inspector__hint" data-live-canvas-zoom-label>Canvas zoom: 100%</p>
     <label class="key-inspector__hint" for="live-resolution-width">Custom preview width</label>
     <input id="live-resolution-width" type="range" min="320" max="1920" step="8" value="1280" />
     <p class="key-inspector__hint" data-live-resolution-label>Resolution: auto</p>
@@ -1242,6 +1249,7 @@
   const liveFontFamilyInput = liveEditorRoot.querySelector("#live-font-family");
   const liveFontSizeInput = liveEditorRoot.querySelector("#live-font-size");
   const liveFontSizeLabel = liveEditorRoot.querySelector("[data-live-font-size-label]");
+  const liveCanvasZoomLabel = liveEditorRoot.querySelector("[data-live-canvas-zoom-label]");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
   liveEditorHud.innerHTML = `
@@ -1268,6 +1276,8 @@
   let hudHideTimer = null;
   let duplicateCounter = 0;
   let liveCanvasMode = false;
+  let liveCanvasZoom = 1;
+  let liveCanvasZoomMode = "1";
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1601,6 +1611,29 @@
       return 1280;
     })();
 
+    const computeCanvasFitZoom = () => {
+      const panelWidth = liveEditorRoot instanceof HTMLElement
+        ? Math.max(0, Math.round(liveEditorRoot.getBoundingClientRect().width))
+        : 0;
+      const gutter = 40;
+      const availableWidth = Math.max(320, window.innerWidth - panelWidth - gutter);
+      const ratio = availableWidth / profileWidth;
+      return Math.min(1, Math.max(0.55, Number.isFinite(ratio) ? ratio : 1));
+    };
+
+    const resolvedZoom = (() => {
+      if (liveCanvasZoomMode === "fit") {
+        return computeCanvasFitZoom();
+      }
+      const parsed = Number.parseFloat(liveCanvasZoomMode);
+      if (Number.isFinite(parsed)) {
+        return Math.min(1, Math.max(0.55, parsed));
+      }
+      return 1;
+    })();
+
+    liveCanvasZoom = resolvedZoom;
+
     document.body.classList.remove(
       "live-editor-vp-desktop",
       "live-editor-vp-tablet",
@@ -1610,6 +1643,8 @@
     document.body.classList.add(`live-editor-vp-${bp}`);
     document.body.classList.toggle("live-editor-canvas", liveCanvasMode);
     document.body.style.setProperty("--live-editor-preview-width", `${profileWidth}px`);
+    document.body.style.setProperty("--live-editor-canvas-zoom", String(resolvedZoom));
+    document.body.classList.toggle("live-editor-canvas-fit", liveCanvasZoomMode === "fit");
 
     const customMatch = String(profile).match(/^w(\d{3,4})$/);
     if (customMatch) {
@@ -1622,6 +1657,25 @@
     if (!(button instanceof HTMLElement)) return;
     button.setAttribute("data-active", String(liveCanvasMode));
     button.textContent = `Canvas mode: ${liveCanvasMode ? "On" : "Off"}`;
+  };
+
+  const updateCanvasZoomButtons = () => {
+    liveEditorRoot.querySelectorAll('[data-live-action="canvas-zoom"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const value = button.getAttribute("data-zoom") || "";
+      const active = value === liveCanvasZoomMode;
+      button.setAttribute("data-active", String(active));
+      button.setAttribute("aria-pressed", String(active));
+    });
+
+    if (!(liveCanvasZoomLabel instanceof HTMLElement)) return;
+
+    if (liveCanvasZoomMode === "fit") {
+      liveCanvasZoomLabel.textContent = `Canvas zoom: Fit (${Math.round(liveCanvasZoom * 100)}%)`;
+      return;
+    }
+
+    liveCanvasZoomLabel.textContent = `Canvas zoom: ${Math.round(liveCanvasZoom * 100)}%`;
   };
 
   const updateSelectedTypographyControls = () => {
@@ -1874,6 +1928,7 @@
     updateVisibilityButtons();
     updateDragScopeButton();
     updateCanvasModeButton();
+    updateCanvasZoomButtons();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -2070,7 +2125,23 @@
       liveCanvasMode = !liveCanvasMode;
       applyViewportProfileToBody();
       updateCanvasModeButton();
+      updateCanvasZoomButtons();
       setLiveEditorStatus(`Canvas mode ${liveCanvasMode ? "enabled" : "disabled"}.`, "info");
+      return;
+    }
+
+    if (action === "canvas-zoom") {
+      const zoom = target.getAttribute("data-zoom") || "";
+      if (!(zoom === "fit" || /^(0\.75|0\.9|1)$/.test(zoom))) return;
+      liveCanvasZoomMode = zoom;
+      applyViewportProfileToBody();
+      updateCanvasZoomButtons();
+      setLiveEditorStatus(
+        zoom === "fit"
+          ? `Canvas zoom set to Fit (${Math.round(liveCanvasZoom * 100)}%).`
+          : `Canvas zoom set to ${Math.round(Number.parseFloat(zoom) * 100)}%.`,
+        "info"
+      );
       return;
     }
 
@@ -2619,6 +2690,11 @@
   }
 
   window.addEventListener("resize", () => {
+    if (editorParam === "1" && liveCanvasZoomMode === "fit") {
+      applyViewportProfileToBody();
+      updateCanvasZoomButtons();
+    }
+
     if (editorParam === "1" && liveEditorViewport === "auto") {
       applyViewportProfileToBody();
       updateViewportButtons();

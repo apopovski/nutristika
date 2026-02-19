@@ -1758,6 +1758,10 @@ body.live-editor-enabled .footer {
   gap: 0.5rem;
 }
 
+.live-editor-actions--zoom {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .live-editor-panel .key-inspector__toggle {
   width: 100%;
   font-size: 0.68rem;
@@ -2070,6 +2074,14 @@ body.live-editor-enabled.live-editor-canvas main,
 body.live-editor-enabled.live-editor-canvas .footer {
   max-width: var(--live-editor-preview-width, 1280px);
   margin-inline: auto;
+}
+
+body.live-editor-enabled.live-editor-canvas .site-header,
+body.live-editor-enabled.live-editor-canvas main,
+body.live-editor-enabled.live-editor-canvas .footer {
+  transform-origin: top center;
+  transform: scale(var(--live-editor-canvas-zoom, 1));
+  transition: transform 0.2s ease, max-width 0.2s ease;
 }
 
 body.live-editor-enabled.live-editor-canvas main {
