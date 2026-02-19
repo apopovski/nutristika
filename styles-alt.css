@@ -2121,6 +2121,116 @@ body.live-editor-enabled.live-editor-beginner [data-live-advanced="true"] {
   display: none !important;
 }
 
+.live-sections-navigator {
+  border: 1.5px solid rgba(17, 17, 17, 0.18);
+  border-radius: 10px;
+  background: rgba(245, 249, 247, 0.9);
+  padding: 0.42rem;
+  display: grid;
+  gap: 0.34rem;
+}
+
+.live-sections-navigator__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.live-sections-navigator__title {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #23352c;
+}
+
+.live-sections-navigator__hint {
+  font-size: 0.56rem;
+  color: #4c5752;
+}
+
+.live-sections-navigator__list {
+  list-style: none;
+  display: grid;
+  gap: 0.26rem;
+  max-height: 168px;
+  overflow: auto;
+}
+
+.live-sections-navigator__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.24rem;
+  border: 1.5px solid rgba(17, 17, 17, 0.17);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.16rem;
+}
+
+.live-sections-navigator__item.is-selected {
+  border-color: rgba(22, 106, 69, 0.6);
+  box-shadow: 0 0 0 1px rgba(22, 106, 69, 0.2) inset;
+}
+
+.live-sections-navigator__item.is-dragging {
+  opacity: 0.6;
+}
+
+.live-sections-navigator__item.is-drop-target {
+  border-color: rgba(255, 143, 43, 0.7);
+}
+
+.live-sections-navigator__drag {
+  font-size: 0.68rem;
+  color: rgba(17, 17, 17, 0.42);
+  line-height: 1;
+  cursor: grab;
+  padding-inline: 0.12rem;
+}
+
+.live-sections-navigator__jump {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.28rem;
+  align-items: center;
+  padding: 0.2rem 0.24rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.live-sections-navigator__jump:hover {
+  background: #f3faf7;
+}
+
+.live-sections-navigator__index {
+  font-size: 0.57rem;
+  font-weight: 800;
+  color: #4f5a55;
+}
+
+.live-sections-navigator__label {
+  font-size: 0.63rem;
+  color: #19221d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-sections-navigator__empty {
+  font-size: 0.6rem;
+  color: #5c6762;
+  border: 1px dashed rgba(17, 17, 17, 0.2);
+  border-radius: 8px;
+  padding: 0.34rem 0.4rem;
+  text-align: center;
+}
+
 .live-editor-panel select {
   border: 1.5px solid rgba(17, 17, 17, 0.25);
   border-radius: 8px;

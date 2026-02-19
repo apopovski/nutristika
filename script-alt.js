@@ -949,6 +949,7 @@
     applyStoredParentOrders();
     applyLanguage(getActiveLang());
     wireLiveEditableNodes();
+    renderLiveSectionsNavigator();
   };
 
   const getLocalValue = ({ key, type, language }) => {
@@ -1307,6 +1308,13 @@
     <label class="key-inspector__hint" for="live-action-search">Quick action search</label>
     <input id="live-action-search" type="search" placeholder="Type: font, section, hide, duplicate..." />
     <p class="key-inspector__hint" data-live-action-search-hint>Canva-like tip: search an action, then click once.</p>
+    <div class="live-sections-navigator" data-live-sections-nav>
+      <div class="live-sections-navigator__head">
+        <p class="live-sections-navigator__title">Sections</p>
+        <p class="live-sections-navigator__hint">Click to jump · Drag to reorder</p>
+      </div>
+      <ul class="live-sections-navigator__list" data-live-sections-list></ul>
+    </div>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="desktop">Desktop</button>
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="tablet">Tablet</button>
@@ -1503,6 +1511,8 @@
   const liveCanvasZoomLabel = liveEditorRoot.querySelector("[data-live-canvas-zoom-label]");
   const liveActionSearchInput = liveEditorRoot.querySelector("#live-action-search");
   const liveActionSearchHint = liveEditorRoot.querySelector("[data-live-action-search-hint]");
+  const liveSectionsNavigatorRoot = liveEditorRoot.querySelector("[data-live-sections-nav]");
+  const liveSectionsNavigatorList = liveEditorRoot.querySelector("[data-live-sections-list]");
   const liveMinimapRoot = liveEditorRoot.querySelector("[data-live-minimap]");
   const liveMinimapStage = liveEditorRoot.querySelector("[data-live-minimap-stage]");
   const liveMinimapDoc = liveEditorRoot.querySelector("[data-live-minimap-doc]");
@@ -1587,6 +1597,7 @@
   let nudgeSaveTimer = null;
   let hudHideTimer = null;
   let duplicateCounter = 0;
+  let liveSectionsNavigatorDragKey = "";
   let liveCanvasMode = false;
   let liveCanvasZoom = 1;
   let liveCanvasZoomMode = "1";
@@ -1797,6 +1808,72 @@
       const hasVisible = [...group.querySelectorAll(".key-inspector__toggle, .live-section-template-btn")]
         .some((node) => node instanceof HTMLElement && !node.classList.contains("is-filter-hidden"));
       group.classList.toggle("is-filter-hidden", !hasVisible && Boolean(query));
+    });
+  };
+
+  const getTopLevelEditableSections = () => {
+    const main = document.querySelector("main");
+    if (!(main instanceof HTMLElement)) return [];
+    return [...main.querySelectorAll(":scope > section[data-layout-key]")]
+      .filter((section) => section instanceof HTMLElement);
+  };
+
+  const getSectionDisplayName = (section) => {
+    if (!(section instanceof HTMLElement)) return "Section";
+    const heading = section.querySelector("h1, h2, h3");
+    const headingText = heading instanceof HTMLElement ? (heading.textContent || "").trim() : "";
+    if (headingText) return headingText;
+
+    const key = section.getAttribute("data-layout-key") || "section";
+    return key
+      .replace(/^layout\./, "")
+      .replace(/\./g, " ")
+      .slice(0, 46);
+  };
+
+  const renderLiveSectionsNavigator = () => {
+    if (!(liveSectionsNavigatorList instanceof HTMLElement)) return;
+
+    const sections = getTopLevelEditableSections();
+    const selectedSection = (() => {
+      if (!(selectedNode instanceof HTMLElement)) return null;
+      if (selectedNode.matches("section[data-layout-key]")) return selectedNode;
+      const closest = selectedNode.closest("section[data-layout-key]");
+      return closest instanceof HTMLElement ? closest : null;
+    })();
+    const selectedSectionKey = selectedSection instanceof HTMLElement
+      ? (selectedSection.getAttribute("data-layout-key") || "")
+      : "";
+
+    liveSectionsNavigatorList.innerHTML = "";
+
+    if (!sections.length) {
+      const empty = document.createElement("li");
+      empty.className = "live-sections-navigator__empty";
+      empty.textContent = "No sections found";
+      liveSectionsNavigatorList.appendChild(empty);
+      return;
+    }
+
+    sections.forEach((section, index) => {
+      const key = section.getAttribute("data-layout-key") || "";
+      if (!key) return;
+
+      const item = document.createElement("li");
+      item.className = "live-sections-navigator__item";
+      item.setAttribute("data-section-key", key);
+      item.setAttribute("draggable", "true");
+      item.classList.toggle("is-selected", key === selectedSectionKey);
+
+      item.innerHTML = `
+        <span class="live-sections-navigator__drag" aria-hidden="true">⋮⋮</span>
+        <button type="button" class="live-sections-navigator__jump" data-live-section-jump="${key}">
+          <span class="live-sections-navigator__index">${index + 1}</span>
+          <span class="live-sections-navigator__label">${getSectionDisplayName(section)}</span>
+        </button>
+      `;
+
+      liveSectionsNavigatorList.appendChild(item);
     });
   };
 
@@ -2560,6 +2637,7 @@
 
     updateSelectedTypographyControls();
     updateLiveElementEditorPanel();
+    renderLiveSectionsNavigator();
     updateLiveEditorQuickbarPosition();
     updateLiveEditorSelectionOverlay();
     if (!(selectedNode instanceof HTMLElement)) {
@@ -3609,12 +3687,101 @@
     }
 
     wireLiveEditableNodes();
+    renderLiveSectionsNavigator();
     renderLiveActionHistory();
   }
 
   if (liveActionSearchInput instanceof HTMLInputElement) {
     liveActionSearchInput.addEventListener("input", () => {
       applyLiveActionSearchFilter(liveActionSearchInput.value);
+    });
+  }
+
+  if (liveSectionsNavigatorRoot instanceof HTMLElement && liveSectionsNavigatorList instanceof HTMLElement) {
+    liveSectionsNavigatorRoot.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const jumpButton = target.closest("[data-live-section-jump]");
+      if (!(jumpButton instanceof HTMLElement)) return;
+
+      const key = jumpButton.getAttribute("data-live-section-jump") || "";
+      if (!key) return;
+
+      const section = document.querySelector(`section[data-layout-key="${key}"]`);
+      if (!(section instanceof HTMLElement)) return;
+
+      setSelectedNode(section, key);
+      section.scrollIntoView({ behavior: "smooth", block: "center" });
+      setLiveEditorStatus(`Jumped to section: ${getSectionDisplayName(section)}`, "info");
+    });
+
+    liveSectionsNavigatorList.addEventListener("dragstart", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const item = target.closest(".live-sections-navigator__item");
+      if (!(item instanceof HTMLElement)) return;
+
+      const key = item.getAttribute("data-section-key") || "";
+      if (!key) return;
+
+      liveSectionsNavigatorDragKey = key;
+      item.classList.add("is-dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", key);
+      }
+    });
+
+    liveSectionsNavigatorList.addEventListener("dragend", () => {
+      liveSectionsNavigatorDragKey = "";
+      liveSectionsNavigatorList.querySelectorAll(".live-sections-navigator__item").forEach((node) => {
+        if (node instanceof HTMLElement) {
+          node.classList.remove("is-dragging", "is-drop-target");
+        }
+      });
+    });
+
+    liveSectionsNavigatorList.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const item = target.closest(".live-sections-navigator__item");
+      if (!(item instanceof HTMLElement)) return;
+
+      liveSectionsNavigatorList.querySelectorAll(".live-sections-navigator__item").forEach((node) => {
+        if (node instanceof HTMLElement) node.classList.remove("is-drop-target");
+      });
+      item.classList.add("is-drop-target");
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+    });
+
+    liveSectionsNavigatorList.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const targetItem = target.closest(".live-sections-navigator__item");
+      if (!(targetItem instanceof HTMLElement)) return;
+
+      const targetKey = targetItem.getAttribute("data-section-key") || "";
+      const sourceKey = liveSectionsNavigatorDragKey || (event.dataTransfer?.getData("text/plain") || "");
+      if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+
+      const sourceSection = document.querySelector(`section[data-layout-key="${sourceKey}"]`);
+      const targetSection = document.querySelector(`section[data-layout-key="${targetKey}"]`);
+      if (!(sourceSection instanceof HTMLElement) || !(targetSection instanceof HTMLElement)) return;
+      if (sourceSection.parentElement !== targetSection.parentElement) return;
+
+      const parent = sourceSection.parentElement;
+      if (!(parent instanceof HTMLElement)) return;
+
+      parent.insertBefore(sourceSection, targetSection);
+      void persistParentChildOrder(parent);
+      renderLiveSectionsNavigator();
+      setSelectedNode(sourceSection, sourceKey);
+      setLiveEditorStatus(`Reordered section: ${getSectionDisplayName(sourceSection)}`, "success");
     });
   }
 
