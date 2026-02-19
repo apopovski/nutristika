@@ -2759,6 +2759,90 @@
     }
   };
 
+  const selectLocalImageFile = () => new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    input.style.pointerEvents = "none";
+    document.body.appendChild(input);
+
+    const cleanup = () => {
+      input.remove();
+    };
+
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0] ? input.files[0] : null;
+      cleanup();
+      resolve(file);
+    }, { once: true });
+
+    input.click();
+
+    window.setTimeout(() => {
+      if (!document.body.contains(input)) return;
+      if (input.files && input.files.length) return;
+      cleanup();
+      resolve(null);
+    }, 60000);
+  });
+
+  const loadImageElementFromFile = (file) => new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not decode selected image file."));
+    };
+    image.src = url;
+  });
+
+  const optimizeImageFileForWeb = async (file) => {
+    const sourceImage = await loadImageElementFromFile(file);
+    const maxDimension = 1920;
+    const quality = 0.82;
+
+    const sourceWidth = Math.max(1, sourceImage.naturalWidth || sourceImage.width || 1);
+    const sourceHeight = Math.max(1, sourceImage.naturalHeight || sourceImage.height || 1);
+    const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+    const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+    const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) {
+      throw new Error("Unable to initialize image optimizer canvas.");
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(sourceImage, 0, 0, targetWidth, targetHeight);
+
+    let dataUrl = canvas.toDataURL("image/webp", quality);
+    if (!/^data:image\/webp/i.test(dataUrl)) {
+      dataUrl = canvas.toDataURL("image/jpeg", 0.84);
+    }
+
+    const base64Payload = dataUrl.split(",")[1] || "";
+    const estimatedBytes = Math.ceil(base64Payload.length * 0.75);
+
+    return {
+      dataUrl,
+      width: targetWidth,
+      height: targetHeight,
+      estimatedKb: Math.max(1, Math.round(estimatedBytes / 1024))
+    };
+  };
+
   document.addEventListener("mouseover", (event) => {
     if (!isInspectorEnabled) return;
     if (inspectorRoot.contains(event.target)) return;
@@ -2814,6 +2898,51 @@
         if (/^hero\.slide\.\d+$/.test(details.key)) {
           selectedHeroSlideKey = details.key;
           setLiveEditorStatus(`Selected ${details.key}`, "info");
+        }
+
+        const wantsUpload = window.confirm(
+          `Edit image for ${details.key}\n\nOK = upload from local computer\nCancel = use image URL`
+        );
+
+        if (wantsUpload) {
+          try {
+            const file = await selectLocalImageFile();
+            if (!file) {
+              setLiveEditorStatus("Image upload canceled.", "info");
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+
+            const optimized = await optimizeImageFileForWeb(file);
+            const save = await saveLiveOverride({
+              key: details.key,
+              value: optimized.dataUrl,
+              type: "image",
+              language: "all"
+            });
+
+            if (!save.ok) {
+              setLiveEditorStatus(`Upload failed: ${save.message}`, "error");
+              return;
+            }
+
+            siteContentOverrides.imageByKey[details.key] = optimized.dataUrl;
+            applyImageOverrides();
+            setLiveEditorStatus(
+              `Uploaded + optimized ${details.key} (${optimized.width}×${optimized.height}, ~${optimized.estimatedKb}KB)`,
+              "success"
+            );
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Could not process the selected image.";
+            setLiveEditorStatus(message, "error");
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
         }
 
         const nextUrl = window.prompt(`Edit image URL for ${details.key}:`, details.value || "");
