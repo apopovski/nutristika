@@ -30,6 +30,7 @@
       "hero.word2": "HABITS.",
       "hero.word3": "LASTING",
       "hero.word4": "Health.",
+      "hero.person.name": "Jasmina Klisch",
       "hero.person.title": "Registered Dietitian Nutritionist",
       "hero.eyebrow": "Registered Dietitian Nutritionist",
       "hero.cta": "Explore Programs",
@@ -103,6 +104,7 @@
       "hero.word2": "GEWOHNHEITEN.",
       "hero.word3": "NACHHALTIGE",
       "hero.word4": "Gesundheit.",
+      "hero.person.name": "Jasmina Klisch",
       "hero.person.title": "Registrierte Ernährungsberaterin",
       "hero.eyebrow": "Registrierte Ernährungsberaterin",
       "hero.cta": "Programme entdecken",
@@ -479,11 +481,15 @@
     }
   };
 
-  const getActiveBreakpoint = () => {
+  let liveEditorViewport = "auto";
+
+  const getViewportBreakpoint = () => {
     if (window.innerWidth <= 640) return "mobile";
     if (window.innerWidth <= 960) return "tablet";
     return "desktop";
   };
+
+  const getActiveBreakpoint = () => (liveEditorViewport === "auto" ? getViewportBreakpoint() : liveEditorViewport);
 
   const applyIconOverrides = (lang) => {
     document.querySelectorAll("[data-icon-key]").forEach((el) => {
@@ -499,13 +505,14 @@
 
   const applyLayoutOverrides = () => {
     const bp = getActiveBreakpoint();
-    document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]").forEach((el) => {
+    document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key], [data-layout-key]").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
 
       const key = el.getAttribute("data-i18n")
         || el.getAttribute("data-i18n-placeholder")
         || el.getAttribute("data-image-key")
-        || el.getAttribute("data-icon-key");
+        || el.getAttribute("data-icon-key")
+        || el.getAttribute("data-layout-key");
       if (!key) return;
 
       const translateKey = `layout.${key}.translate.${bp}`;
@@ -642,7 +649,7 @@
 
   const getInspectorNode = (target) => {
     if (!(target instanceof Element)) return null;
-    return target.closest("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]");
+    return target.closest("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key], [data-layout-key]");
   };
 
   const getInspectorDetails = (node) => {
@@ -650,6 +657,15 @@
     const placeholderKey = node.getAttribute("data-i18n-placeholder");
     const imageKey = node.getAttribute("data-image-key");
     const iconKey = node.getAttribute("data-icon-key");
+    const layoutKey = node.getAttribute("data-layout-key");
+
+    if (layoutKey) {
+      return {
+        type: "layout",
+        key: layoutKey,
+        value: ""
+      };
+    }
 
     if (iconKey) {
       return {
@@ -931,6 +947,12 @@
   liveEditorRoot.innerHTML = `
     <p class="key-inspector__hint"><strong>Live Editor</strong> — click text/image to edit instantly.</p>
     <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="desktop">Desktop</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="tablet">Tablet</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="mobile">Mobile</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid">Grid: Off</button>
+    </div>
+    <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-autosave" data-active="true">Autosave: On</button>
       <button type="button" class="key-inspector__toggle" data-live-action="save-now">Save now</button>
       <button type="button" class="key-inspector__toggle" data-live-action="undo">Undo</button>
@@ -971,12 +993,39 @@
     }
   };
 
+  const getTranslateFromElement = (el) => {
+    if (!(el instanceof HTMLElement)) return { x: 0, y: 0 };
+
+    const transform = window.getComputedStyle(el).transform;
+    if (!transform || transform === "none") {
+      return { x: 0, y: 0 };
+    }
+
+    try {
+      const matrix = new DOMMatrixReadOnly(transform);
+      return {
+        x: Math.round(matrix.m41 || 0),
+        y: Math.round(matrix.m42 || 0)
+      };
+    } catch {
+      return { x: 0, y: 0 };
+    }
+  };
+
+  const updateViewportButtons = () => {
+    liveEditorRoot.querySelectorAll('[data-live-action="viewport"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const viewport = button.getAttribute("data-viewport") || "";
+      const isActive = viewport === liveEditorViewport;
+      button.setAttribute("data-active", String(isActive));
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  };
+
   const saveLayoutTranslate = async (key, el) => {
     if (!(el instanceof HTMLElement) || !key) return;
 
-    const matrix = new DOMMatrixReadOnly(window.getComputedStyle(el).transform);
-    const x = Math.round(matrix.m41 || 0);
-    const y = Math.round(matrix.m42 || 0);
+    const { x, y } = getTranslateFromElement(el);
     const translateKey = `layout.${key}.translate.${getActiveBreakpoint()}`;
 
     const result = await saveLiveOverride({
@@ -1030,22 +1079,56 @@
 
       startX = downEvent.clientX;
       startY = downEvent.clientY;
-      const matrix = new DOMMatrixReadOnly(window.getComputedStyle(el).transform);
-      originX = Math.round(matrix.m41 || 0);
-      originY = Math.round(matrix.m42 || 0);
+      const origin = getTranslateFromElement(el);
+      originX = origin.x;
+      originY = origin.y;
 
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
     });
   };
 
+  const ensureLayoutKeys = () => {
+    const layoutSelectors = [
+      ".site-header",
+      ".hero",
+      ".hero-headline",
+      ".hero-cta",
+      ".hero-profile",
+      ".hero-float.f1",
+      ".hero-float.f2",
+      ".hero-float.f3",
+      ".story",
+      ".products",
+      ".quotes",
+      ".faq",
+      ".cta",
+      ".inquiry",
+      ".footer",
+      ".hero-person-name"
+    ];
+
+    layoutSelectors.forEach((selector) => {
+      document.querySelectorAll(selector).forEach((el, index) => {
+        if (!(el instanceof HTMLElement)) return;
+        if (el.hasAttribute("data-layout-key")) return;
+
+        const base = selector.replace(/[^a-z0-9]+/gi, ".").replace(/^\.+|\.+$/g, "").toLowerCase();
+        const suffix = index > 0 ? `.${index + 1}` : "";
+        el.setAttribute("data-layout-key", `layout.elem.${base}${suffix}`);
+      });
+    });
+  };
+
   const wireLiveEditableNodes = () => {
     if (editorParam !== "1") return;
-    document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]").forEach((el) => {
+    ensureLayoutKeys();
+    document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key], [data-layout-key]").forEach((el) => {
       const key = el.getAttribute("data-i18n")
         || el.getAttribute("data-i18n-placeholder")
         || el.getAttribute("data-image-key")
-        || el.getAttribute("data-icon-key");
+        || el.getAttribute("data-icon-key")
+        || el.getAttribute("data-layout-key");
 
       if (!key || !(el instanceof HTMLElement)) return;
       if (el.dataset.dragBound === "true") return;
@@ -1057,6 +1140,10 @@
   if (editorParam === "1") {
     document.body.appendChild(liveEditorRoot);
     document.body.classList.add("live-editor-enabled");
+
+    liveEditorViewport = getViewportBreakpoint();
+    document.body.classList.add(`live-editor-vp-${liveEditorViewport}`);
+    updateViewportButtons();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -1104,6 +1191,28 @@
 
     const action = target.getAttribute("data-live-action");
     if (!action) return;
+
+    if (action === "viewport") {
+      const viewport = target.getAttribute("data-viewport");
+      if (viewport !== "desktop" && viewport !== "tablet" && viewport !== "mobile") return;
+
+      liveEditorViewport = viewport;
+      document.body.classList.remove("live-editor-vp-desktop", "live-editor-vp-tablet", "live-editor-vp-mobile");
+      document.body.classList.add(`live-editor-vp-${viewport}`);
+      updateViewportButtons();
+      applyLayoutOverrides();
+      setLiveEditorStatus(`Editing ${viewport} layout`, "info");
+      return;
+    }
+
+    if (action === "toggle-grid") {
+      const active = document.body.classList.toggle("live-editor-grid");
+      if (target instanceof HTMLElement) {
+        target.textContent = `Grid: ${active ? "On" : "Off"}`;
+      }
+      setLiveEditorStatus(`Grid ${active ? "enabled" : "disabled"}`, "info");
+      return;
+    }
 
     if (action === "toggle-autosave") {
       autosaveEnabled = !autosaveEnabled;
@@ -1320,6 +1429,13 @@
       }
 
       const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+
+      if (details.type === "layout") {
+        setLiveEditorStatus(`Selected ${details.key}. Drag to move.`, "info");
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
 
       if (details.type === "image") {
         if (/^hero\.slide\.\d+$/.test(details.key)) {
