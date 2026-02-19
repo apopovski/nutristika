@@ -2272,7 +2272,7 @@
       return;
     }
 
-    liveEditorCommandFilteredActions.forEach((item, index) => {
+    const renderCommandRow = (item, index) => {
       const li = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
@@ -2314,6 +2314,62 @@
       button.appendChild(meta);
       li.appendChild(button);
       liveEditorCommandList.appendChild(li);
+    };
+
+    const appendGroupHeader = (title) => {
+      const li = document.createElement("li");
+      li.className = "live-editor-command__group";
+      li.textContent = title;
+      liveEditorCommandList.appendChild(li);
+    };
+
+    const indexMap = new Map();
+    liveEditorCommandFilteredActions.forEach((item, index) => {
+      indexMap.set(item.commandId || item.key || String(index), index);
+    });
+
+    const topGroups = [];
+
+    if (!query) {
+      const recentItems = liveEditorCommandFilteredActions.filter((item) => Number(item?.usageCount || 0) > 0).slice(0, 6);
+      const recentIds = new Set(recentItems.map((item) => item.commandId || item.key || "").filter(Boolean));
+      const otherItems = liveEditorCommandFilteredActions.filter((item) => {
+        const id = item.commandId || item.key || "";
+        return !recentIds.has(id);
+      });
+
+      if (recentItems.length) {
+        topGroups.push({ title: "Recently used", items: recentItems });
+      }
+
+      if (otherItems.length) {
+        topGroups.push({ title: recentItems.length ? "Other commands" : "Commands", items: otherItems });
+      }
+    } else {
+      const bestItems = liveEditorCommandFilteredActions.slice(0, 5);
+      const bestIds = new Set(bestItems.map((item) => item.commandId || item.key || "").filter(Boolean));
+      const otherItems = liveEditorCommandFilteredActions.filter((item) => {
+        const id = item.commandId || item.key || "";
+        return !bestIds.has(id);
+      });
+
+      if (bestItems.length) {
+        topGroups.push({ title: "Best matches", items: bestItems });
+      }
+
+      if (otherItems.length) {
+        topGroups.push({ title: "Other commands", items: otherItems });
+      }
+    }
+
+    topGroups.forEach((group) => {
+      if (!group.items.length) return;
+      appendGroupHeader(group.title);
+      group.items.forEach((item) => {
+        const idx = indexMap.get(item.commandId || item.key || "");
+        if (!Number.isFinite(idx)) return;
+        renderCommandRow(item, idx);
+      });
     });
 
     setLiveCommandActiveItem(0);
