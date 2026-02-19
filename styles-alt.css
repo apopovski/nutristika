@@ -1836,6 +1836,24 @@ body.inspector-enabled [data-layout-key] {
   background: rgba(255, 143, 43, 0.2);
 }
 
+.live-editor-hud__visibility {
+  border: 1.5px solid rgba(49, 164, 111, 0.85);
+  border-radius: 999px;
+  background: rgba(49, 164, 111, 0.12);
+  color: #d8ffe8;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.34rem 0.52rem;
+  cursor: pointer;
+}
+
+.live-editor-hud__visibility:hover {
+  background: rgba(49, 164, 111, 0.22);
+}
+
 body.live-editor-enabled [data-i18n],
 body.live-editor-enabled [data-i18n-placeholder],
 body.live-editor-enabled [data-image-key],

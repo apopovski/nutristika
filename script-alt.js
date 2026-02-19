@@ -981,6 +981,7 @@
     <div class="live-editor-hud__actions">
       <button type="button" class="live-editor-hud__copy" data-live-hud-action="copy-coords">Copy coords</button>
       <button type="button" class="live-editor-hud__reset" data-live-hud-action="reset-coords">Reset 0,0</button>
+      <button type="button" class="live-editor-hud__visibility" data-live-hud-action="reset-visibility">Reset visibility</button>
     </div>
   `;
 
@@ -988,6 +989,7 @@
   const liveEditorHudCoords = liveEditorHud.querySelector(".live-editor-hud__coords");
   const liveEditorHudCopyButton = liveEditorHud.querySelector('[data-live-hud-action="copy-coords"]');
   const liveEditorHudResetButton = liveEditorHud.querySelector('[data-live-hud-action="reset-coords"]');
+  const liveEditorHudVisibilityButton = liveEditorHud.querySelector('[data-live-hud-action="reset-visibility"]');
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
@@ -1086,6 +1088,36 @@
     showLiveEditorHud({ key: selectedNodeKey, x: 0, y: 0 });
     await saveLayoutTranslate(selectedNodeKey, selectedNode);
     setLiveEditorStatus(`Reset ${selectedNodeKey} to 0,0 on ${getActiveBreakpoint()}`, "success");
+  };
+
+  const resetSelectedVisibility = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Select an element first to reset visibility.", "info");
+      return;
+    }
+
+    const bp = getActiveBreakpoint();
+    const hiddenKey = `layout.${selectedNodeKey}.hidden.${bp}`;
+
+    await deleteLiveOverride({
+      key: hiddenKey,
+      type: "text",
+      language: "all"
+    });
+
+    if (siteContentOverrides.textByKey[hiddenKey]) {
+      delete siteContentOverrides.textByKey[hiddenKey].all;
+      if (!Object.keys(siteContentOverrides.textByKey[hiddenKey]).length) {
+        delete siteContentOverrides.textByKey[hiddenKey];
+      }
+    }
+
+    selectedNode.style.display = "";
+    applyLayoutOverrides();
+    const coords = getTranslateFromElement(selectedNode);
+    showLiveEditorHud({ key: selectedNodeKey, x: coords.x, y: coords.y });
+    hideLiveEditorHudSoon(1800);
+    setLiveEditorStatus(`Reset visibility for ${selectedNodeKey} on ${bp}`, "success");
   };
 
   const setSelectedNode = (node, key) => {
@@ -1364,6 +1396,12 @@
   if (liveEditorHudResetButton instanceof HTMLButtonElement) {
     liveEditorHudResetButton.addEventListener("click", () => {
       void resetSelectedCoords();
+    });
+  }
+
+  if (liveEditorHudVisibilityButton instanceof HTMLButtonElement) {
+    liveEditorHudVisibilityButton.addEventListener("click", () => {
+      void resetSelectedVisibility();
     });
   }
 
