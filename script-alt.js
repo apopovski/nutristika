@@ -489,7 +489,46 @@
     return "desktop";
   };
 
-  const getActiveBreakpoint = () => (liveEditorViewport === "auto" ? getViewportBreakpoint() : liveEditorViewport);
+  const getBreakpointFromProfile = (profile) => {
+    if (profile === "mobile" || profile === "tablet" || profile === "desktop") {
+      return profile;
+    }
+
+    const match = String(profile || "").match(/^w(\d{3,4})$/);
+    const width = Number.parseInt(match?.[1] || "", 10);
+    if (Number.isFinite(width)) {
+      if (width <= 640) return "mobile";
+      if (width <= 960) return "tablet";
+      return "desktop";
+    }
+
+    return getViewportBreakpoint();
+  };
+
+  const getActiveViewportProfile = () => {
+    if (liveEditorViewport === "auto") {
+      return getViewportBreakpoint();
+    }
+
+    const match = String(liveEditorViewport).match(/^w(\d{3,4})$/);
+    if (match) {
+      const width = Number.parseInt(match[1], 10);
+      if (Number.isFinite(width)) {
+        return `w${width}`;
+      }
+    }
+
+    return liveEditorViewport;
+  };
+
+  const getActiveBreakpoint = () => getBreakpointFromProfile(getActiveViewportProfile());
+
+  const getActiveLayoutProfiles = () => {
+    const profile = getActiveViewportProfile();
+    const bp = getBreakpointFromProfile(profile);
+    if (profile === bp) return [bp];
+    return [profile, bp];
+  };
 
   const applyIconOverrides = (lang) => {
     document.querySelectorAll("[data-icon-key]").forEach((el) => {
@@ -504,7 +543,19 @@
   };
 
   const applyLayoutOverrides = () => {
-    const bp = getActiveBreakpoint();
+    const profiles = getActiveLayoutProfiles();
+
+    const readOverrideForProfiles = (base) => {
+      for (const profile of profiles) {
+        const key = `${base}.${profile}`;
+        const value = getTextOverride(key, "en") || getTextOverride(key, "all");
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
+      }
+      return "";
+    };
+
     document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key], [data-layout-key]").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
 
@@ -515,13 +566,15 @@
         || el.getAttribute("data-layout-key");
       if (!key) return;
 
-      const translateKey = `layout.${key}.translate.${bp}`;
-      const hiddenKey = `layout.${key}.hidden.${bp}`;
-      const translate = getTextOverride(translateKey, "en") || getTextOverride(translateKey, "all") || "";
-      const hidden = getTextOverride(hiddenKey, "en") || getTextOverride(hiddenKey, "all") || "0";
+      const translate = readOverrideForProfiles(`layout.${key}.translate`);
+      const hidden = readOverrideForProfiles(`layout.${key}.hidden`) || "0";
+      const fontFamily = readOverrideForProfiles(`style.${key}.fontFamily`);
+      const fontSize = readOverrideForProfiles(`style.${key}.fontSize`);
 
       el.style.transform = "";
       el.style.display = "";
+      el.style.fontFamily = "";
+      el.style.fontSize = "";
 
       if (hidden === "1") {
         el.style.display = "none";
@@ -536,6 +589,18 @@
         const tx = Number.isFinite(x) ? x : 0;
         const ty = Number.isFinite(y) ? y : 0;
         el.style.transform = `translate(${tx}px, ${ty}px)`;
+      }
+
+      if (fontFamily) {
+        el.style.fontFamily = fontFamily;
+      }
+
+      if (fontSize) {
+        const raw = fontSize.trim();
+        const parsed = Number.parseFloat(raw);
+        el.style.fontSize = Number.isFinite(parsed) && /^\d+(\.\d+)?$/.test(raw)
+          ? `${parsed}px`
+          : raw;
       }
     });
   };
@@ -776,6 +841,7 @@
 
   const rerenderLiveState = () => {
     applyImageOverrides();
+    applyStoredDuplicateNodes();
     applyLanguage(getActiveLang());
     wireLiveEditableNodes();
   };
@@ -790,6 +856,51 @@
     if (typeof entry[lang] === "string") return entry[lang];
     if (typeof entry.all === "string") return entry.all;
     return null;
+  };
+
+  const applyStoredDuplicateNodes = () => {
+    if (typeof ensureLayoutKeys === "function") {
+      ensureLayoutKeys();
+    }
+
+    const byKey = siteContentOverrides?.textByKey || {};
+    const duplicateIds = Object.keys(byKey)
+      .map((key) => (key.match(/^dup\.node\.([^.]+)\.html$/) || [])[1] || "")
+      .filter(Boolean);
+
+    duplicateIds.forEach((dupId) => {
+      if (document.querySelector(`[data-dup-id="${dupId}"]`)) return;
+
+      const html = getTextOverride(`dup.node.${dupId}.html`, "all") || "";
+      const parentKey = getTextOverride(`dup.node.${dupId}.parent`, "all") || "";
+      const afterKey = getTextOverride(`dup.node.${dupId}.after`, "all") || "";
+      if (!html || !parentKey) return;
+
+      const parent = document.querySelector(`[data-layout-key="${parentKey}"]`);
+      if (!(parent instanceof HTMLElement)) return;
+
+      const fragment = document.createElement("div");
+      fragment.innerHTML = html;
+      const node = fragment.firstElementChild;
+      if (!(node instanceof HTMLElement)) return;
+
+      node.setAttribute("data-dup-id", dupId);
+      if (!node.hasAttribute("data-layout-key")) {
+        node.setAttribute("data-layout-key", `layout.dup.${dupId}`);
+      }
+      node.removeAttribute("data-live-selected");
+      node.removeAttribute("data-dragging");
+
+      const afterNode = afterKey
+        ? parent.querySelector(`[data-layout-key="${afterKey}"]`)
+        : null;
+
+      if (afterNode instanceof HTMLElement && afterNode.parentElement === parent) {
+        parent.insertBefore(node, afterNode.nextSibling);
+      } else {
+        parent.appendChild(node);
+      }
+    });
   };
 
   const setLocalValue = ({ key, type, language, value }) => {
@@ -879,11 +990,11 @@
     const key = operation.payload?.key || "(unknown key)";
     const type = operation.payload?.type || "text";
 
-    if (/^layout\..+\.translate\.(desktop|tablet|mobile)$/.test(key)) {
+    if (/^layout\..+\.translate\.(desktop|tablet|mobile|w\d{3,4})$/.test(key)) {
       return `${kind} position · ${key}`;
     }
 
-    if (/^layout\..+\.hidden\.(desktop|tablet|mobile)$/.test(key)) {
+    if (/^layout\..+\.hidden\.(desktop|tablet|mobile|w\d{3,4})$/.test(key)) {
       return `${kind} visibility · ${key}`;
     }
 
@@ -893,11 +1004,11 @@
   const getOperationCategory = (operation) => {
     const key = operation.payload?.key || "";
 
-    if (/^layout\..+\.translate\.(desktop|tablet|mobile)$/.test(key)) {
+    if (/^layout\..+\.translate\.(desktop|tablet|mobile|w\d{3,4})$/.test(key)) {
       return "position";
     }
 
-    if (/^layout\..+\.hidden\.(desktop|tablet|mobile)$/.test(key)) {
+    if (/^layout\..+\.hidden\.(desktop|tablet|mobile|w\d{3,4})$/.test(key)) {
       return "visibility";
     }
 
@@ -1066,6 +1177,15 @@
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid">Grid: Off</button>
     </div>
     <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1728">MBP 16"</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1280">MBP 13"</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1024">Tablet 11"</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w390">Phone</button>
+    </div>
+    <label class="key-inspector__hint" for="live-resolution-width">Custom preview width</label>
+    <input id="live-resolution-width" type="range" min="320" max="1920" step="8" value="1280" />
+    <p class="key-inspector__hint" data-live-resolution-label>Resolution: auto</p>
+    <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-autosave" data-active="true">Autosave: On</button>
       <button type="button" class="key-inspector__toggle" data-live-action="save-now">Save now</button>
       <button type="button" class="key-inspector__toggle" data-live-action="undo">Undo</button>
@@ -1078,7 +1198,22 @@
     </div>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-drag-scope" data-mode="child">Move: Child element</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="duplicate-selected">Duplicate selected</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="remove-selected">Remove selected</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="restore-selected">Restore selected</button>
     </div>
+    <label class="key-inspector__hint" for="live-font-family">Font style (selected)</label>
+    <select id="live-font-family">
+      <option value="">Default</option>
+      <option value='"Space Grotesk", system-ui, sans-serif'>Space Grotesk</option>
+      <option value='"Bricolage Grotesque", system-ui, sans-serif'>Bricolage Grotesque</option>
+      <option value='"Allura", cursive'>Allura</option>
+      <option value='Georgia, "Times New Roman", serif'>Serif</option>
+      <option value="Arial, Helvetica, sans-serif">Arial</option>
+    </select>
+    <label class="key-inspector__hint" for="live-font-size">Font size (selected)</label>
+    <input id="live-font-size" type="range" min="10" max="120" step="1" value="16" />
+    <p class="key-inspector__hint" data-live-font-size-label>Font size: default</p>
     <label class="key-inspector__hint" for="live-slider-width">Hero slider width</label>
     <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
     <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
@@ -1099,6 +1234,11 @@
 
   const liveEditorStatus = liveEditorRoot.querySelector(".key-inspector__status");
   const liveWidthInput = liveEditorRoot.querySelector("#live-slider-width");
+  const liveResolutionInput = liveEditorRoot.querySelector("#live-resolution-width");
+  const liveResolutionLabel = liveEditorRoot.querySelector("[data-live-resolution-label]");
+  const liveFontFamilyInput = liveEditorRoot.querySelector("#live-font-family");
+  const liveFontSizeInput = liveEditorRoot.querySelector("#live-font-size");
+  const liveFontSizeLabel = liveEditorRoot.querySelector("[data-live-font-size-label]");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
   liveEditorHud.innerHTML = `
@@ -1123,6 +1263,7 @@
   let dragScopeMode = "child";
   let nudgeSaveTimer = null;
   let hudHideTimer = null;
+  let duplicateCounter = 0;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1246,6 +1387,131 @@
     setLiveEditorStatus(`Reset visibility for ${selectedNodeKey} on ${bp}`, "success");
   };
 
+  const saveSelectedTypography = async ({ family, size }) => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Select an element first to style typography.", "info");
+      return;
+    }
+
+    const profile = getActiveViewportProfile();
+
+    if (typeof family === "string") {
+      const key = `style.${selectedNodeKey}.fontFamily.${profile}`;
+      if (family) {
+        await saveLiveOverride({ key, value: family, type: "text", language: "all" });
+        if (!siteContentOverrides.textByKey[key]) siteContentOverrides.textByKey[key] = {};
+        siteContentOverrides.textByKey[key].all = family;
+      } else {
+        await deleteLiveOverride({ key, type: "text", language: "all" });
+        delete siteContentOverrides.textByKey[key];
+      }
+    }
+
+    if (typeof size === "string") {
+      const key = `style.${selectedNodeKey}.fontSize.${profile}`;
+      if (size) {
+        await saveLiveOverride({ key, value: size, type: "text", language: "all" });
+        if (!siteContentOverrides.textByKey[key]) siteContentOverrides.textByKey[key] = {};
+        siteContentOverrides.textByKey[key].all = size;
+      } else {
+        await deleteLiveOverride({ key, type: "text", language: "all" });
+        delete siteContentOverrides.textByKey[key];
+      }
+    }
+
+    applyLayoutOverrides();
+    updateSelectedTypographyControls();
+  };
+
+  const duplicateSelectedNode = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Select an element first to duplicate.", "info");
+      return;
+    }
+
+    const parent = selectedNode.parentElement;
+    if (!(parent instanceof HTMLElement)) {
+      setLiveEditorStatus("Could not duplicate this element.", "error");
+      return;
+    }
+
+    const parentKey = parent.getAttribute("data-layout-key");
+    if (!parentKey) {
+      setLiveEditorStatus("Parent lacks layout key. Select a structured element.", "error");
+      return;
+    }
+
+    const clone = selectedNode.cloneNode(true);
+    if (!(clone instanceof HTMLElement)) {
+      setLiveEditorStatus("Could not duplicate this element.", "error");
+      return;
+    }
+
+    const dupId = `${Date.now().toString(36)}${(++duplicateCounter).toString(36)}`;
+    const dupLayoutKey = `layout.dup.${dupId}`;
+    clone.removeAttribute("id");
+    clone.removeAttribute("data-live-selected");
+    clone.removeAttribute("data-dragging");
+    clone.setAttribute("data-dup-id", dupId);
+    clone.setAttribute("data-layout-key", dupLayoutKey);
+
+    selectedNode.insertAdjacentElement("afterend", clone);
+
+    const htmlKey = `dup.node.${dupId}.html`;
+    const parentKeyStore = `dup.node.${dupId}.parent`;
+    const afterKeyStore = `dup.node.${dupId}.after`;
+
+    await saveLiveOverride({ key: htmlKey, value: clone.outerHTML, type: "text", language: "all" });
+    await saveLiveOverride({ key: parentKeyStore, value: parentKey, type: "text", language: "all" });
+    await saveLiveOverride({ key: afterKeyStore, value: selectedNodeKey, type: "text", language: "all" });
+
+    if (!siteContentOverrides.textByKey[htmlKey]) siteContentOverrides.textByKey[htmlKey] = {};
+    if (!siteContentOverrides.textByKey[parentKeyStore]) siteContentOverrides.textByKey[parentKeyStore] = {};
+    if (!siteContentOverrides.textByKey[afterKeyStore]) siteContentOverrides.textByKey[afterKeyStore] = {};
+    siteContentOverrides.textByKey[htmlKey].all = clone.outerHTML;
+    siteContentOverrides.textByKey[parentKeyStore].all = parentKey;
+    siteContentOverrides.textByKey[afterKeyStore].all = selectedNodeKey;
+
+    wireLiveEditableNodes();
+    setSelectedNode(clone, dupLayoutKey);
+    setLiveEditorStatus(`Duplicated ${selectedNodeKey}`, "success");
+  };
+
+  const removeSelectedNode = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Select an element first to remove.", "info");
+      return;
+    }
+
+    const dupId = selectedNode.getAttribute("data-dup-id");
+    if (dupId) {
+      const htmlKey = `dup.node.${dupId}.html`;
+      const parentKeyStore = `dup.node.${dupId}.parent`;
+      const afterKeyStore = `dup.node.${dupId}.after`;
+
+      await deleteLiveOverride({ key: htmlKey, type: "text", language: "all" });
+      await deleteLiveOverride({ key: parentKeyStore, type: "text", language: "all" });
+      await deleteLiveOverride({ key: afterKeyStore, type: "text", language: "all" });
+
+      delete siteContentOverrides.textByKey[htmlKey];
+      delete siteContentOverrides.textByKey[parentKeyStore];
+      delete siteContentOverrides.textByKey[afterKeyStore];
+
+      selectedNode.remove();
+      setSelectedNode(null, "");
+      setLiveEditorStatus("Removed duplicated element.", "success");
+      return;
+    }
+
+    const profile = getActiveViewportProfile();
+    const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
+    await saveLiveOverride({ key: hiddenKey, value: "1", type: "text", language: "all" });
+    if (!siteContentOverrides.textByKey[hiddenKey]) siteContentOverrides.textByKey[hiddenKey] = {};
+    siteContentOverrides.textByKey[hiddenKey].all = "1";
+    applyLayoutOverrides();
+    setLiveEditorStatus(`Removed (hidden) ${selectedNodeKey} on ${profile}`, "success");
+  };
+
   const setSelectedNode = (node, key) => {
     if (selectedNode instanceof HTMLElement) {
       selectedNode.removeAttribute("data-live-selected");
@@ -1259,6 +1525,8 @@
       const coords = getTranslateFromElement(selectedNode);
       showLiveEditorHud({ key: selectedNodeKey, x: coords.x, y: coords.y });
     }
+
+    updateSelectedTypographyControls();
   };
 
   const getTranslateFromElement = (el) => {
@@ -1284,22 +1552,101 @@
     liveEditorRoot.querySelectorAll('[data-live-action="viewport"]').forEach((button) => {
       if (!(button instanceof HTMLElement)) return;
       const viewport = button.getAttribute("data-viewport") || "";
-      const isActive = viewport === liveEditorViewport;
+      const isActive = viewport === getBreakpointFromProfile(getActiveViewportProfile());
       button.setAttribute("data-active", String(isActive));
       button.setAttribute("aria-pressed", String(isActive));
     });
+
+    const activeProfile = getActiveViewportProfile();
+    liveEditorRoot.querySelectorAll('[data-live-action="viewport-profile"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const profile = button.getAttribute("data-profile") || "";
+      const isActive = profile === activeProfile;
+      button.setAttribute("data-active", String(isActive));
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+
+    if (liveResolutionInput instanceof HTMLInputElement) {
+      const match = String(activeProfile).match(/^w(\d{3,4})$/);
+      if (match) {
+        liveResolutionInput.value = match[1];
+      }
+    }
+
+    if (liveResolutionLabel instanceof HTMLElement) {
+      const bp = getBreakpointFromProfile(activeProfile);
+      if (/^w\d{3,4}$/.test(String(activeProfile))) {
+        liveResolutionLabel.textContent = `Resolution: ${String(activeProfile).slice(1)}px (${bp})`;
+      } else {
+        liveResolutionLabel.textContent = `Resolution: ${bp}`;
+      }
+    }
+  };
+
+  const applyViewportProfileToBody = () => {
+    const profile = getActiveViewportProfile();
+    const bp = getBreakpointFromProfile(profile);
+
+    document.body.classList.remove(
+      "live-editor-vp-desktop",
+      "live-editor-vp-tablet",
+      "live-editor-vp-mobile",
+      "live-editor-vp-custom"
+    );
+    document.body.classList.add(`live-editor-vp-${bp}`);
+
+    const customMatch = String(profile).match(/^w(\d{3,4})$/);
+    if (customMatch) {
+      document.body.classList.add("live-editor-vp-custom");
+      document.body.style.setProperty("--live-editor-preview-width", `${customMatch[1]}px`);
+    } else {
+      document.body.style.removeProperty("--live-editor-preview-width");
+    }
+  };
+
+  const updateSelectedTypographyControls = () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      if (liveFontFamilyInput instanceof HTMLSelectElement) {
+        liveFontFamilyInput.value = "";
+      }
+      if (liveFontSizeLabel instanceof HTMLElement) {
+        liveFontSizeLabel.textContent = "Font size: default";
+      }
+      return;
+    }
+
+    const profiles = getActiveLayoutProfiles();
+    let family = "";
+    let size = "";
+    for (const profile of profiles) {
+      family = family || getTextOverride(`style.${selectedNodeKey}.fontFamily.${profile}`, "all") || "";
+      size = size || getTextOverride(`style.${selectedNodeKey}.fontSize.${profile}`, "all") || "";
+    }
+
+    if (liveFontFamilyInput instanceof HTMLSelectElement) {
+      liveFontFamilyInput.value = family || "";
+    }
+
+    if (liveFontSizeInput instanceof HTMLInputElement) {
+      const parsed = Number.parseInt(String(size || ""), 10);
+      liveFontSizeInput.value = Number.isFinite(parsed) ? String(parsed) : "16";
+    }
+
+    if (liveFontSizeLabel instanceof HTMLElement) {
+      liveFontSizeLabel.textContent = size ? `Font size: ${size}` : "Font size: default";
+    }
   };
 
   const updateVisibilityButtons = () => {
-    const bp = getActiveBreakpoint();
+    const profile = getActiveViewportProfile();
     liveEditorRoot.querySelectorAll('[data-live-action="hide-selected"]').forEach((button) => {
       if (!(button instanceof HTMLElement)) return;
-      button.textContent = `Hide (${bp})`;
+      button.textContent = `Hide (${profile})`;
     });
 
     liveEditorRoot.querySelectorAll('[data-live-action="show-selected"]').forEach((button) => {
       if (!(button instanceof HTMLElement)) return;
-      button.textContent = `Show (${bp})`;
+      button.textContent = `Show (${profile})`;
     });
   };
 
@@ -1332,7 +1679,8 @@
     if (!(el instanceof HTMLElement) || !key) return;
 
     const { x, y } = getTranslateFromElement(el);
-    const translateKey = `layout.${key}.translate.${getActiveBreakpoint()}`;
+    const profile = getActiveViewportProfile();
+    const translateKey = `layout.${key}.translate.${profile}`;
 
     const result = await saveLiveOverride({
       key: translateKey,
@@ -1350,7 +1698,7 @@
       siteContentOverrides.textByKey[translateKey] = {};
     }
     siteContentOverrides.textByKey[translateKey].all = `${x},${y}`;
-    setLiveEditorStatus(`Saved position (${getActiveBreakpoint()}) for ${key}`, "success");
+    setLiveEditorStatus(`Saved position (${profile}) for ${key}`, "success");
     hideLiveEditorHudSoon();
   };
 
@@ -1453,6 +1801,9 @@
       ".hero-float.f1",
       ".hero-float.f2",
       ".hero-float.f3",
+      ".hero-slide",
+      ".leaf-image",
+      ".product-card-media",
       ".story",
       ".products",
       ".quotes",
@@ -1498,7 +1849,7 @@
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
-    document.body.classList.add(`live-editor-vp-${liveEditorViewport}`);
+    applyViewportProfileToBody();
     updateViewportButtons();
     updateVisibilityButtons();
     updateDragScopeButton();
@@ -1529,6 +1880,35 @@
   if (liveEditorHudVisibilityButton instanceof HTMLButtonElement) {
     liveEditorHudVisibilityButton.addEventListener("click", () => {
       void resetSelectedVisibility();
+    });
+  }
+
+  if (liveResolutionInput instanceof HTMLInputElement) {
+    liveResolutionInput.addEventListener("input", () => {
+      liveEditorViewport = `w${liveResolutionInput.value}`;
+      applyViewportProfileToBody();
+      updateViewportButtons();
+      updateVisibilityButtons();
+      applyLayoutOverrides();
+      updateSelectedTypographyControls();
+    });
+  }
+
+  if (liveFontFamilyInput instanceof HTMLSelectElement) {
+    liveFontFamilyInput.addEventListener("change", () => {
+      void saveSelectedTypography({ family: liveFontFamilyInput.value.trim(), size: undefined });
+    });
+  }
+
+  if (liveFontSizeInput instanceof HTMLInputElement) {
+    liveFontSizeInput.addEventListener("input", () => {
+      if (liveFontSizeLabel instanceof HTMLElement) {
+        liveFontSizeLabel.textContent = `Font size: ${liveFontSizeInput.value}px`;
+      }
+    });
+
+    liveFontSizeInput.addEventListener("change", () => {
+      void saveSelectedTypography({ size: `${liveFontSizeInput.value}px`, family: undefined });
     });
   }
 
@@ -1634,12 +2014,25 @@
       if (viewport !== "desktop" && viewport !== "tablet" && viewport !== "mobile") return;
 
       liveEditorViewport = viewport;
-      document.body.classList.remove("live-editor-vp-desktop", "live-editor-vp-tablet", "live-editor-vp-mobile");
-      document.body.classList.add(`live-editor-vp-${viewport}`);
+      applyViewportProfileToBody();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
+      updateSelectedTypographyControls();
       setLiveEditorStatus(`Editing ${viewport} layout`, "info");
+      return;
+    }
+
+    if (action === "viewport-profile") {
+      const profile = target.getAttribute("data-profile") || "";
+      if (!/^w\d{3,4}$/.test(profile)) return;
+      liveEditorViewport = profile;
+      applyViewportProfileToBody();
+      updateViewportButtons();
+      updateVisibilityButtons();
+      applyLayoutOverrides();
+      updateSelectedTypographyControls();
+      setLiveEditorStatus(`Editing custom resolution ${profile.slice(1)}px`, "info");
       return;
     }
 
@@ -1674,6 +2067,30 @@
           : "Drag mode: moving parent layer",
         "info"
       );
+      return;
+    }
+
+    if (action === "duplicate-selected") {
+      await duplicateSelectedNode();
+      return;
+    }
+
+    if (action === "remove-selected") {
+      await removeSelectedNode();
+      return;
+    }
+
+    if (action === "restore-selected") {
+      if (!selectedNodeKey) {
+        setLiveEditorStatus("Select any editable element first.", "info");
+        return;
+      }
+      const profile = getActiveViewportProfile();
+      const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
+      await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
+      delete siteContentOverrides.textByKey[hiddenKey];
+      applyLayoutOverrides();
+      setLiveEditorStatus(`Restored ${selectedNodeKey} on ${profile}`, "success");
       return;
     }
 
@@ -1731,7 +2148,8 @@
         return;
       }
 
-      const hiddenKey = `layout.${selectedNodeKey}.hidden.${getActiveBreakpoint()}`;
+      const profile = getActiveViewportProfile();
+      const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
       const hiddenValue = action === "hide-selected" ? "1" : "0";
       const result = await saveLiveOverride({
         key: hiddenKey,
@@ -1751,7 +2169,7 @@
       siteContentOverrides.textByKey[hiddenKey].all = hiddenValue;
       applyLayoutOverrides();
       setLiveEditorStatus(
-        `${action === "hide-selected" ? "Hidden" : "Shown"} ${selectedNodeKey} on ${getActiveBreakpoint()}`,
+        `${action === "hide-selected" ? "Hidden" : "Shown"} ${selectedNodeKey} on ${profile}`,
         "success"
       );
       return;
@@ -2140,6 +2558,7 @@
     };
 
     applyImageOverrides();
+    applyStoredDuplicateNodes();
     wireLiveEditableNodes();
     const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
     applyLanguage(activeLang);
@@ -2171,6 +2590,11 @@
   }
 
   window.addEventListener("resize", () => {
+    if (editorParam === "1" && liveEditorViewport === "auto") {
+      applyViewportProfileToBody();
+      updateViewportButtons();
+      updateVisibilityButtons();
+    }
     applyLayoutOverrides();
   });
 
