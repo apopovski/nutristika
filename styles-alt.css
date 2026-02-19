@@ -1751,8 +1751,22 @@ body.inspector-enabled [data-image-key] {
 
 body.live-editor-enabled [data-i18n],
 body.live-editor-enabled [data-i18n-placeholder],
-body.live-editor-enabled [data-image-key] {
+body.live-editor-enabled [data-image-key],
+body.live-editor-enabled [data-icon-key] {
   cursor: pointer;
+}
+
+body.live-editor-enabled .hero-headline {
+  pointer-events: auto;
+}
+
+body.live-editor-enabled [data-live-selected="true"] {
+  outline: 3px dashed rgba(49, 164, 111, 0.95);
+  outline-offset: 4px;
+}
+
+body.live-editor-enabled [data-dragging="true"] {
+  cursor: grabbing !important;
 }
 
 @media (max-width: 640px) {

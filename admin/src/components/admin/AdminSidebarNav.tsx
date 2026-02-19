@@ -24,6 +24,12 @@ const navItems: NavItem[] = [
     icon: "🧩"
   },
   {
+    href: "/admin/blocks-editor",
+    title: "Blocks Editor",
+    description: "Section builder",
+    icon: "🧱"
+  },
+  {
     href: "/admin/homepage-editor",
     title: "Edit Homepage",
     description: "Update main content",

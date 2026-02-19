@@ -189,6 +189,226 @@
     description: i18nDict.en["story.body"]
   };
 
+  const fallbackServicesImages = [
+    "https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1505253758473-96b7015fcd40?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1547592166-23ac45744acd?q=80&w=1200&auto=format&fit=crop"
+  ];
+
+  const fallbackServicesBlocks = {
+    en: [
+      {
+        badge: i18nDict.en["services.card1.badge"],
+        title: i18nDict.en["services.card1.title"],
+        text: i18nDict.en["services.card1.text"],
+        cta: i18nDict.en["services.card1.cta"],
+        href: "#cta",
+        imageUrl: fallbackServicesImages[0],
+        featured: false
+      },
+      {
+        badge: i18nDict.en["services.card2.badge"],
+        title: i18nDict.en["services.card2.title"],
+        text: i18nDict.en["services.card2.text"],
+        cta: i18nDict.en["services.card2.cta"],
+        href: "#cta",
+        imageUrl: fallbackServicesImages[1],
+        featured: true
+      },
+      {
+        badge: i18nDict.en["services.card3.badge"],
+        title: i18nDict.en["services.card3.title"],
+        text: i18nDict.en["services.card3.text"],
+        cta: i18nDict.en["services.card3.cta"],
+        href: "#cta",
+        imageUrl: fallbackServicesImages[2],
+        featured: false
+      }
+    ],
+    de: [
+      {
+        badge: i18nDict.de["services.card1.badge"],
+        title: i18nDict.de["services.card1.title"],
+        text: i18nDict.de["services.card1.text"],
+        cta: i18nDict.de["services.card1.cta"],
+        href: "#cta",
+        imageUrl: fallbackServicesImages[0],
+        featured: false
+      },
+      {
+        badge: i18nDict.de["services.card2.badge"],
+        title: i18nDict.de["services.card2.title"],
+        text: i18nDict.de["services.card2.text"],
+        cta: i18nDict.de["services.card2.cta"],
+        href: "#cta",
+        imageUrl: fallbackServicesImages[1],
+        featured: true
+      },
+      {
+        badge: i18nDict.de["services.card3.badge"],
+        title: i18nDict.de["services.card3.title"],
+        text: i18nDict.de["services.card3.text"],
+        cta: i18nDict.de["services.card3.cta"],
+        href: "#cta",
+        imageUrl: fallbackServicesImages[2],
+        featured: false
+      }
+    ]
+  };
+
+  const fallbackFaqBlocks = {
+    en: [
+      {
+        q: i18nDict.en["faq.q1"],
+        a: i18nDict.en["faq.a1"]
+      },
+      {
+        q: i18nDict.en["faq.q2"],
+        a: i18nDict.en["faq.a2"]
+      },
+      {
+        q: i18nDict.en["faq.q3"],
+        a: i18nDict.en["faq.a3"]
+      }
+    ],
+    de: [
+      {
+        q: i18nDict.de["faq.q1"],
+        a: i18nDict.de["faq.a1"]
+      },
+      {
+        q: i18nDict.de["faq.q2"],
+        a: i18nDict.de["faq.a2"]
+      },
+      {
+        q: i18nDict.de["faq.q3"],
+        a: i18nDict.de["faq.a3"]
+      }
+    ]
+  };
+
+  const renderServicesBlocks = (lang) => {
+    const cardsContainer = document.querySelector("#products .cards");
+    if (!cardsContainer) return;
+
+    const raw = getTextOverride("blocks.services", "all");
+    if (!raw) {
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const list = Array.isArray(parsed?.[lang])
+      ? parsed[lang]
+      : Array.isArray(parsed?.en)
+        ? parsed.en
+        : [];
+
+    if (!list.length) {
+      return;
+    }
+
+    const normalized = list
+      .map((item, index) => {
+        const fallback = (fallbackServicesBlocks[lang] || fallbackServicesBlocks.en)[index % fallbackServicesBlocks.en.length];
+        const imageFallback = fallback?.imageUrl || fallbackServicesImages[index % fallbackServicesImages.length];
+
+        return {
+          badge: typeof item?.badge === "string" ? item.badge : fallback.badge,
+          title: typeof item?.title === "string" ? item.title : fallback.title,
+          text: typeof item?.text === "string" ? item.text : fallback.text,
+          cta: typeof item?.cta === "string" ? item.cta : fallback.cta,
+          href: typeof item?.href === "string" && item.href.trim() ? item.href : "#cta",
+          imageUrl: typeof item?.imageUrl === "string" && item.imageUrl.trim() ? item.imageUrl : imageFallback,
+          featured: Boolean(item?.featured)
+        };
+      })
+      .slice(0, 24);
+
+    cardsContainer.innerHTML = "";
+
+    normalized.forEach((card) => {
+      const article = document.createElement("article");
+      article.className = `product-card${card.featured ? " featured" : ""}`;
+
+      const image = document.createElement("img");
+      image.className = "product-card-media leaf-image";
+      image.src = card.imageUrl;
+      image.alt = card.title || "Service card image";
+
+      const badge = document.createElement("span");
+      badge.textContent = card.badge;
+
+      const title = document.createElement("h3");
+      title.textContent = card.title;
+
+      const text = document.createElement("p");
+      text.textContent = card.text;
+
+      const link = document.createElement("a");
+      link.href = card.href;
+      link.textContent = card.cta;
+
+      article.appendChild(image);
+      article.appendChild(badge);
+      article.appendChild(title);
+      article.appendChild(text);
+      article.appendChild(link);
+      cardsContainer.appendChild(article);
+    });
+  };
+
+  const renderFaqBlocks = (lang) => {
+    const faqSection = document.querySelector("#faq");
+    if (!faqSection) return;
+
+    const raw = getTextOverride("blocks.faq", "all");
+    if (!raw) return;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const list = Array.isArray(parsed?.[lang])
+      ? parsed[lang]
+      : Array.isArray(parsed?.en)
+        ? parsed.en
+        : [];
+
+    if (!list.length) return;
+
+    const normalized = list
+      .map((item, index) => {
+        const fallback = (fallbackFaqBlocks[lang] || fallbackFaqBlocks.en)[index % fallbackFaqBlocks.en.length];
+        return {
+          q: typeof item?.q === "string" && item.q.trim() ? item.q : fallback.q,
+          a: typeof item?.a === "string" && item.a.trim() ? item.a : fallback.a
+        };
+      })
+      .slice(0, 24);
+
+    faqSection.querySelectorAll("details").forEach((node) => node.remove());
+
+    normalized.forEach((item) => {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = item.q;
+      const answer = document.createElement("p");
+      answer.textContent = item.a;
+      details.appendChild(summary);
+      details.appendChild(answer);
+      faqSection.appendChild(details);
+    });
+  };
+
   const detectPreferredLanguage = () => {
     const browserLanguages = [
       ...(Array.isArray(navigator.languages) ? navigator.languages : []),
@@ -259,6 +479,60 @@
     }
   };
 
+  const getActiveBreakpoint = () => {
+    if (window.innerWidth <= 640) return "mobile";
+    if (window.innerWidth <= 960) return "tablet";
+    return "desktop";
+  };
+
+  const applyIconOverrides = (lang) => {
+    document.querySelectorAll("[data-icon-key]").forEach((el) => {
+      const key = el.getAttribute("data-icon-key");
+      if (!key) return;
+
+      const override = getTextOverride(key, lang) || getTextOverride(key, "en") || getTextOverride(key, "all");
+      if (override) {
+        el.textContent = override;
+      }
+    });
+  };
+
+  const applyLayoutOverrides = () => {
+    const bp = getActiveBreakpoint();
+    document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+
+      const key = el.getAttribute("data-i18n")
+        || el.getAttribute("data-i18n-placeholder")
+        || el.getAttribute("data-image-key")
+        || el.getAttribute("data-icon-key");
+      if (!key) return;
+
+      const translateKey = `layout.${key}.translate.${bp}`;
+      const hiddenKey = `layout.${key}.hidden.${bp}`;
+      const translate = getTextOverride(translateKey, "en") || getTextOverride(translateKey, "all") || "";
+      const hidden = getTextOverride(hiddenKey, "en") || getTextOverride(hiddenKey, "all") || "0";
+
+      el.style.transform = "";
+      el.style.display = "";
+
+      if (hidden === "1") {
+        el.style.display = "none";
+        return;
+      }
+
+      const [xRaw, yRaw] = String(translate).split(",");
+      const x = Number.parseInt((xRaw || "").trim(), 10);
+      const y = Number.parseInt((yRaw || "").trim(), 10);
+
+      if (Number.isFinite(x) || Number.isFinite(y)) {
+        const tx = Number.isFinite(x) ? x : 0;
+        const ty = Number.isFinite(y) ? y : 0;
+        el.style.transform = `translate(${tx}px, ${ty}px)`;
+      }
+    });
+  };
+
   const fetchFirstJson = async (path) => {
     for (const base of apiBases) {
       const prefix = base.replace(/\/$/, "");
@@ -324,6 +598,11 @@
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", String(isActive));
     });
+
+    renderServicesBlocks(selected);
+    renderFaqBlocks(selected);
+    applyIconOverrides(selected);
+    applyLayoutOverrides();
   };
 
   const initialLang = localStorage.getItem("site-language") || detectPreferredLanguage();
@@ -363,13 +642,22 @@
 
   const getInspectorNode = (target) => {
     if (!(target instanceof Element)) return null;
-    return target.closest("[data-i18n], [data-i18n-placeholder], [data-image-key]");
+    return target.closest("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]");
   };
 
   const getInspectorDetails = (node) => {
     const i18nKey = node.getAttribute("data-i18n");
     const placeholderKey = node.getAttribute("data-i18n-placeholder");
     const imageKey = node.getAttribute("data-image-key");
+    const iconKey = node.getAttribute("data-icon-key");
+
+    if (iconKey) {
+      return {
+        type: "icon",
+        key: iconKey,
+        value: (node.textContent || "").trim()
+      };
+    }
 
     if (imageKey) {
       return {
@@ -468,28 +756,190 @@
     };
   };
 
-  const saveLiveOverride = async ({ key, value, type, language }) =>
-    callLiveEditorApi("POST", {
+  const getActiveLang = () => localStorage.getItem("site-language") || detectPreferredLanguage();
+
+  const rerenderLiveState = () => {
+    applyImageOverrides();
+    applyLanguage(getActiveLang());
+    wireLiveEditableNodes();
+  };
+
+  const getLocalValue = ({ key, type, language }) => {
+    if (type === "image") {
+      return siteContentOverrides?.imageByKey?.[key] ?? null;
+    }
+
+    const lang = language || "all";
+    const entry = siteContentOverrides?.textByKey?.[key] || {};
+    if (typeof entry[lang] === "string") return entry[lang];
+    if (typeof entry.all === "string") return entry.all;
+    return null;
+  };
+
+  const setLocalValue = ({ key, type, language, value }) => {
+    if (type === "image") {
+      if (value === null || value === undefined || value === "") {
+        delete siteContentOverrides.imageByKey[key];
+      } else {
+        siteContentOverrides.imageByKey[key] = String(value);
+      }
+      rerenderLiveState();
+      return;
+    }
+
+    const lang = language || "all";
+    if (!siteContentOverrides.textByKey[key]) {
+      siteContentOverrides.textByKey[key] = {};
+    }
+
+    if (value === null || value === undefined) {
+      delete siteContentOverrides.textByKey[key][lang];
+      if (!Object.keys(siteContentOverrides.textByKey[key]).length) {
+        delete siteContentOverrides.textByKey[key];
+      }
+    } else {
+      siteContentOverrides.textByKey[key][lang] = String(value);
+    }
+
+    rerenderLiveState();
+  };
+
+  let autosaveEnabled = true;
+  let pendingOperations = [];
+  let autosaveTimer = null;
+  let isFlushingOperations = false;
+  const undoStack = [];
+
+  const buildInverseOperation = (operation) => {
+    const previousValue = operation.previousValue;
+    if (previousValue === null || previousValue === undefined || previousValue === "") {
+      return {
+        kind: "delete",
+        payload: {
+          key: operation.payload.key,
+          type: operation.payload.type,
+          language: operation.payload.language
+        },
+        previousValue: operation.payload.value
+      };
+    }
+
+    return {
+      kind: "save",
+      payload: {
+        key: operation.payload.key,
+        value: previousValue,
+        type: operation.payload.type,
+        language: operation.payload.language
+      },
+      previousValue: operation.payload.value
+    };
+  };
+
+  const executeOperation = async (operation) => {
+    if (operation.kind === "save") {
+      return callLiveEditorApi("POST", {
+        key: operation.payload.key,
+        value: operation.payload.value,
+        content_type: operation.payload.type,
+        language: operation.payload.type === "image" ? "all" : (operation.payload.language || "all")
+      });
+    }
+
+    return callLiveEditorApi("DELETE", {
+      key: operation.payload.key,
+      content_type: operation.payload.type,
+      language: operation.payload.type === "image" ? "all" : (operation.payload.language || "all")
+    });
+  };
+
+  const flushPendingOperations = async () => {
+    if (isFlushingOperations || !pendingOperations.length) return;
+    isFlushingOperations = true;
+
+    while (pendingOperations.length) {
+      const operation = pendingOperations.shift();
+      const result = await executeOperation(operation);
+
+      if (!result.ok) {
+        pendingOperations.unshift(operation);
+        setLiveEditorStatus(`Save failed: ${result.message}`, "error");
+        break;
+      }
+
+      undoStack.push(buildInverseOperation(operation));
+      if (undoStack.length > 60) undoStack.shift();
+    }
+
+    if (!pendingOperations.length) {
+      setLiveEditorStatus("All changes saved.", "success");
+    }
+
+    isFlushingOperations = false;
+  };
+
+  const scheduleAutosaveFlush = () => {
+    if (!autosaveEnabled) return;
+    if (autosaveTimer) {
+      window.clearTimeout(autosaveTimer);
+    }
+    autosaveTimer = window.setTimeout(() => {
+      autosaveTimer = null;
+      void flushPendingOperations();
+    }, 900);
+  };
+
+  const saveLiveOverride = async ({ key, value, type, language }) => {
+    const payload = {
       key,
       value,
-      content_type: type,
+      type,
       language: type === "image" ? "all" : (language || "all")
-    });
+    };
 
-  const deleteLiveOverride = async ({ key, type, language }) =>
-    callLiveEditorApi("DELETE", {
+    const operation = {
+      kind: "save",
+      payload,
+      previousValue: getLocalValue(payload)
+    };
+
+    pendingOperations.push(operation);
+    scheduleAutosaveFlush();
+    return { ok: true, queued: true };
+  };
+
+  const deleteLiveOverride = async ({ key, type, language }) => {
+    const payload = {
       key,
-      content_type: type,
+      type,
       language: type === "image" ? "all" : (language || "all")
-    });
+    };
+
+    const operation = {
+      kind: "delete",
+      payload,
+      previousValue: getLocalValue(payload)
+    };
+
+    pendingOperations.push(operation);
+    scheduleAutosaveFlush();
+    return { ok: true, queued: true };
+  };
 
   const liveEditorRoot = document.createElement("div");
   liveEditorRoot.className = "key-inspector live-editor-panel";
   liveEditorRoot.innerHTML = `
     <p class="key-inspector__hint"><strong>Live Editor</strong> — click text/image to edit instantly.</p>
     <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-autosave" data-active="true">Autosave: On</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="save-now">Save now</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="undo">Undo</button>
+    </div>
+    <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="add-slide">+ Add hero slide</button>
       <button type="button" class="key-inspector__toggle" data-live-action="remove-slide">− Remove selected slide</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="hide-selected">Hide selected</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="show-selected">Show selected</button>
     </div>
     <label class="key-inspector__hint" for="live-slider-width">Hero slider width</label>
     <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
@@ -499,11 +949,109 @@
   const liveEditorStatus = liveEditorRoot.querySelector(".key-inspector__status");
   const liveWidthInput = liveEditorRoot.querySelector("#live-slider-width");
   let selectedHeroSlideKey = "";
+  let selectedNodeKey = "";
+  let selectedNode = null;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
     liveEditorStatus.textContent = message;
     liveEditorStatus.setAttribute("data-tone", tone);
+  };
+
+  const setSelectedNode = (node, key) => {
+    if (selectedNode instanceof HTMLElement) {
+      selectedNode.removeAttribute("data-live-selected");
+    }
+
+    selectedNode = node instanceof HTMLElement ? node : null;
+    selectedNodeKey = key || "";
+
+    if (selectedNode instanceof HTMLElement) {
+      selectedNode.setAttribute("data-live-selected", "true");
+    }
+  };
+
+  const saveLayoutTranslate = async (key, el) => {
+    if (!(el instanceof HTMLElement) || !key) return;
+
+    const matrix = new DOMMatrixReadOnly(window.getComputedStyle(el).transform);
+    const x = Math.round(matrix.m41 || 0);
+    const y = Math.round(matrix.m42 || 0);
+    const translateKey = `layout.${key}.translate.${getActiveBreakpoint()}`;
+
+    const result = await saveLiveOverride({
+      key: translateKey,
+      value: `${x},${y}`,
+      type: "text",
+      language: "all"
+    });
+
+    if (!result.ok) {
+      setLiveEditorStatus(`Position save failed: ${result.message}`, "error");
+      return;
+    }
+
+    if (!siteContentOverrides.textByKey[translateKey]) {
+      siteContentOverrides.textByKey[translateKey] = {};
+    }
+    siteContentOverrides.textByKey[translateKey].all = `${x},${y}`;
+    setLiveEditorStatus(`Saved position (${getActiveBreakpoint()}) for ${key}`, "success");
+  };
+
+  const attachDragHandler = (el, key) => {
+    if (!(el instanceof HTMLElement)) return;
+
+    let startX = 0;
+    let startY = 0;
+    let originX = 0;
+    let originY = 0;
+
+    const onMove = (moveEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      el.style.transform = `translate(${originX + dx}px, ${originY + dy}px)`;
+    };
+
+    const onUp = async () => {
+      el.removeAttribute("data-dragging");
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      await saveLayoutTranslate(key, el);
+    };
+
+    el.addEventListener("pointerdown", (downEvent) => {
+      if (!liveEditorEnabled) return;
+      if (liveEditorRoot.contains(downEvent.target)) return;
+      if (downEvent.button !== 0) return;
+
+      downEvent.preventDefault();
+      setSelectedNode(el, key);
+      el.setAttribute("data-dragging", "true");
+
+      startX = downEvent.clientX;
+      startY = downEvent.clientY;
+      const matrix = new DOMMatrixReadOnly(window.getComputedStyle(el).transform);
+      originX = Math.round(matrix.m41 || 0);
+      originY = Math.round(matrix.m42 || 0);
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    });
+  };
+
+  const wireLiveEditableNodes = () => {
+    if (editorParam !== "1") return;
+    document.querySelectorAll("[data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]").forEach((el) => {
+      const key = el.getAttribute("data-i18n")
+        || el.getAttribute("data-i18n-placeholder")
+        || el.getAttribute("data-image-key")
+        || el.getAttribute("data-icon-key");
+
+      if (!key || !(el instanceof HTMLElement)) return;
+      if (el.dataset.dragBound === "true") return;
+      el.dataset.dragBound = "true";
+      attachDragHandler(el, key);
+    });
   };
 
   if (editorParam === "1") {
@@ -516,6 +1064,8 @@
     } else {
       setLiveEditorStatus("Missing token. Open this page from admin → Open live editor.", "error");
     }
+
+    wireLiveEditableNodes();
   }
 
   if (liveWidthInput instanceof HTMLInputElement) {
@@ -555,8 +1105,93 @@
     const action = target.getAttribute("data-live-action");
     if (!action) return;
 
+    if (action === "toggle-autosave") {
+      autosaveEnabled = !autosaveEnabled;
+      if (target instanceof HTMLElement) {
+        target.setAttribute("data-active", String(autosaveEnabled));
+        target.textContent = `Autosave: ${autosaveEnabled ? "On" : "Off"}`;
+      }
+      if (autosaveEnabled) {
+        scheduleAutosaveFlush();
+      }
+      setLiveEditorStatus(`Autosave ${autosaveEnabled ? "enabled" : "disabled"}.`, "info");
+      return;
+    }
+
+    if (action === "save-now") {
+      await flushPendingOperations();
+      return;
+    }
+
+    if (action === "undo") {
+      if (pendingOperations.length) {
+        const pending = pendingOperations.pop();
+        const inversePending = buildInverseOperation(pending);
+        setLocalValue({
+          key: inversePending.payload.key,
+          type: inversePending.payload.type,
+          language: inversePending.payload.language,
+          value: inversePending.kind === "save" ? inversePending.payload.value : null
+        });
+        setLiveEditorStatus("Undid last unsaved change.", "success");
+        return;
+      }
+
+      const inverse = undoStack.pop();
+      if (!inverse) {
+        setLiveEditorStatus("Nothing to undo.", "info");
+        return;
+      }
+
+      const result = await executeOperation(inverse);
+      if (!result.ok) {
+        undoStack.push(inverse);
+        setLiveEditorStatus(`Undo failed: ${result.message}`, "error");
+        return;
+      }
+
+      setLocalValue({
+        key: inverse.payload.key,
+        type: inverse.payload.type,
+        language: inverse.payload.language,
+        value: inverse.kind === "save" ? inverse.payload.value : null
+      });
+
+      setLiveEditorStatus("Undo applied.", "success");
+      return;
+    }
+
     if (!liveEditorEnabled) {
       setLiveEditorStatus("Token missing for live edits.", "error");
+      return;
+    }
+
+    if (action === "hide-selected" || action === "show-selected") {
+      if (!selectedNodeKey) {
+        setLiveEditorStatus("Select any editable element first.", "info");
+        return;
+      }
+
+      const hiddenKey = `layout.${selectedNodeKey}.hidden.${getActiveBreakpoint()}`;
+      const hiddenValue = action === "hide-selected" ? "1" : "0";
+      const result = await saveLiveOverride({
+        key: hiddenKey,
+        value: hiddenValue,
+        type: "text",
+        language: "all"
+      });
+
+      if (!result.ok) {
+        setLiveEditorStatus(`Visibility update failed: ${result.message}`, "error");
+        return;
+      }
+
+      if (!siteContentOverrides.textByKey[hiddenKey]) {
+        siteContentOverrides.textByKey[hiddenKey] = {};
+      }
+      siteContentOverrides.textByKey[hiddenKey].all = hiddenValue;
+      applyLayoutOverrides();
+      setLiveEditorStatus(`${action === "hide-selected" ? "Hidden" : "Shown"} ${selectedNodeKey}`, "success");
       return;
     }
 
@@ -587,6 +1222,7 @@
 
       siteContentOverrides.imageByKey[nextKey] = url.trim();
       applyImageOverrides();
+      wireLiveEditableNodes();
       setLiveEditorStatus(`Added ${nextKey}`, "success");
       return;
     }
@@ -679,6 +1315,10 @@
       const details = getInspectorDetails(node);
       if (!details.key) return;
 
+      if (node instanceof HTMLElement) {
+        setSelectedNode(node, details.key);
+      }
+
       const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
 
       if (details.type === "image") {
@@ -726,8 +1366,9 @@
         return;
       }
 
-      if (details.type === "placeholder") {
-        const placeholderText = window.prompt(`Edit placeholder for ${details.key}:`, details.value || "");
+      if (details.type === "placeholder" || details.type === "icon") {
+        const promptLabel = details.type === "icon" ? "Edit icon name" : "Edit placeholder";
+        const placeholderText = window.prompt(`${promptLabel} for ${details.key}:`, details.value || "");
         if (placeholderText === null) {
           event.preventDefault();
           event.stopPropagation();
@@ -900,6 +1541,7 @@
     };
 
     applyImageOverrides();
+    wireLiveEditableNodes();
     const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
     applyLanguage(activeLang);
   };
@@ -928,6 +1570,10 @@
       });
     });
   }
+
+  window.addEventListener("resize", () => {
+    applyLayoutOverrides();
+  });
 
   const setMenuState = (open) => {
     if (!menuToggle || !mobileMenu) return;

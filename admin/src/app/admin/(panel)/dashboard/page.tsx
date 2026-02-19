@@ -13,6 +13,18 @@ export default function AdminDashboardPage() {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
+          href="/admin/blocks-editor"
+          className="group rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Phase 2</p>
+          <h3 className="mt-2 text-base font-semibold text-slate-900 group-hover:text-slate-700">Blocks Editor</h3>
+          <p className="mt-1 text-sm text-slate-600">Add, remove, and reorder service cards visually.</p>
+          <p className="mt-3 inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            Open editor →
+          </p>
+        </Link>
+
+        <Link
           href="/admin/site-editor"
           className="group rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
         >

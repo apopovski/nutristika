@@ -7,6 +7,7 @@ import { getSupabaseClient } from "@/lib/supabaseClient";
 const titleMap: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
   "/admin/site-editor": "Site Editor",
+  "/admin/blocks-editor": "Blocks Editor",
   "/admin/homepage-editor": "Homepage Editor",
   "/admin/edit-homepage": "Homepage Editor"
 };
