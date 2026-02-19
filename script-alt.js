@@ -530,6 +530,18 @@
     return [profile, bp];
   };
 
+  const readStyleOverrideForActiveProfiles = (base) => {
+    const profiles = getActiveLayoutProfiles();
+    for (const profile of profiles) {
+      const key = `${base}.${profile}`;
+      const value = getTextOverride(key, "en") || getTextOverride(key, "all");
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+    return "";
+  };
+
   const applyIconOverrides = (lang) => {
     document.querySelectorAll("[data-icon-key]").forEach((el) => {
       const key = el.getAttribute("data-icon-key");
@@ -570,11 +582,13 @@
       const hidden = readOverrideForProfiles(`layout.${key}.hidden`) || "0";
       const fontFamily = readOverrideForProfiles(`style.${key}.fontFamily`);
       const fontSize = readOverrideForProfiles(`style.${key}.fontSize`);
+      const minHeight = readOverrideForProfiles(`style.${key}.minHeight`);
 
       el.style.transform = "";
       el.style.display = "";
       el.style.fontFamily = "";
       el.style.fontSize = "";
+      el.style.minHeight = "";
 
       if (hidden === "1") {
         el.style.display = "none";
@@ -599,6 +613,14 @@
         const raw = fontSize.trim();
         const parsed = Number.parseFloat(raw);
         el.style.fontSize = Number.isFinite(parsed) && /^\d+(\.\d+)?$/.test(raw)
+          ? `${parsed}px`
+          : raw;
+      }
+
+      if (minHeight) {
+        const raw = minHeight.trim();
+        const parsed = Number.parseFloat(raw);
+        el.style.minHeight = Number.isFinite(parsed) && /^\d+(\.\d+)?$/.test(raw)
           ? `${parsed}px`
           : raw;
       }
@@ -1346,9 +1368,17 @@
       <option value="">Default</option>
       <option value='"Space Grotesk", system-ui, sans-serif'>Space Grotesk</option>
       <option value='"Bricolage Grotesque", system-ui, sans-serif'>Bricolage Grotesque</option>
+      <option value='"Inter", system-ui, sans-serif'>Inter</option>
+      <option value='"Manrope", system-ui, sans-serif'>Manrope</option>
+      <option value='"Poppins", system-ui, sans-serif'>Poppins</option>
+      <option value='"DM Sans", system-ui, sans-serif'>DM Sans</option>
+      <option value='"Plus Jakarta Sans", system-ui, sans-serif'>Plus Jakarta Sans</option>
       <option value='"Allura", cursive'>Allura</option>
+      <option value='"Playfair Display", Georgia, serif'>Playfair Display</option>
+      <option value='"Merriweather", Georgia, serif'>Merriweather</option>
       <option value='Georgia, "Times New Roman", serif'>Serif</option>
       <option value="Arial, Helvetica, sans-serif">Arial</option>
+      <option value='"Courier Prime", "Courier New", monospace'>Courier Prime</option>
     </select>
     <label class="key-inspector__hint" for="live-font-size">Font size (selected)</label>
     <input id="live-font-size" type="range" min="10" max="120" step="1" value="16" />
@@ -1374,6 +1404,17 @@
           <button type="button" class="key-inspector__toggle" data-live-element-action="save-image-url">Save image URL</button>
           <button type="button" class="key-inspector__toggle" data-live-element-action="upload-image">Upload + optimize</button>
         </div>
+      </div>
+      <div class="live-element-editor__section" data-live-element-section="section">
+        <p class="key-inspector__hint">Section tools</p>
+        <div class="live-editor-actions">
+          <button type="button" class="key-inspector__toggle" data-live-element-action="add-section-above">+ Section above</button>
+          <button type="button" class="key-inspector__toggle" data-live-element-action="add-section-below">+ Section below</button>
+          <button type="button" class="key-inspector__toggle" data-live-element-action="remove-section">− Remove section</button>
+        </div>
+        <label class="key-inspector__hint" for="live-section-height">Section min height</label>
+        <input id="live-section-height" type="range" min="160" max="1400" step="10" value="480" />
+        <p class="key-inspector__hint" data-live-section-height-label>Section min height: auto</p>
       </div>
       <p class="key-inspector__hint">Move element</p>
       <div class="live-editor-actions live-editor-actions--move">
@@ -1427,6 +1468,8 @@
   const liveElementEditorType = liveEditorRoot.querySelector("[data-live-element-type]");
   const liveElementTextInput = liveEditorRoot.querySelector("#live-element-text");
   const liveElementImageUrlInput = liveEditorRoot.querySelector("#live-element-image-url");
+  const liveSectionHeightInput = liveEditorRoot.querySelector("#live-section-height");
+  const liveSectionHeightLabel = liveEditorRoot.querySelector("[data-live-section-height-label]");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
   liveEditorHud.innerHTML = `
@@ -1691,7 +1734,15 @@
     const type = details?.type || "none";
     const canEditText = type === "text" || type === "placeholder" || type === "icon";
     const canEditImage = type === "image";
-    const isEditableType = canEditText || canEditImage;
+    const selectedSection = (() => {
+      if (!(selectedNode instanceof HTMLElement)) return null;
+      if (selectedNode.matches("section[data-layout-key]")) return selectedNode;
+      const closestSection = selectedNode.closest("section[data-layout-key]");
+      if (closestSection instanceof HTMLElement) return closestSection;
+      return null;
+    })();
+    const canEditSection = selectedSection instanceof HTMLElement;
+    const isEditableType = canEditText || canEditImage || canEditSection;
 
     liveElementEditorKey.textContent = hasSelection
       ? `Key: ${selectedNodeKey}`
@@ -1714,6 +1765,9 @@
       if ((action === "save-text" && !canEditText) || ((action === "save-image-url" || action === "upload-image") && !canEditImage)) {
         button.disabled = true;
       }
+      if (["add-section-above", "add-section-below", "remove-section"].includes(action) && !canEditSection) {
+        button.disabled = true;
+      }
     });
 
     const textSection = liveElementEditorRoot.querySelector('[data-live-element-section="text"]');
@@ -1724,6 +1778,32 @@
     const imageSection = liveElementEditorRoot.querySelector('[data-live-element-section="image"]');
     if (imageSection instanceof HTMLElement) {
       imageSection.classList.toggle("is-hidden", !canEditImage);
+    }
+
+    const sectionSection = liveElementEditorRoot.querySelector('[data-live-element-section="section"]');
+    if (sectionSection instanceof HTMLElement) {
+      sectionSection.classList.toggle("is-hidden", !canEditSection);
+    }
+
+    if (liveSectionHeightInput instanceof HTMLInputElement) {
+      liveSectionHeightInput.disabled = !canEditSection;
+      if (canEditSection) {
+        const sectionKey = selectedSection.getAttribute("data-layout-key") || "";
+        const override = readStyleOverrideForActiveProfiles(`style.${sectionKey}.minHeight`);
+        const computed = Number.parseInt(window.getComputedStyle(selectedSection).minHeight || "", 10);
+        const fromOverride = Number.parseInt(String(override || ""), 10);
+        const fallback = Number.isFinite(computed) && computed > 0 ? computed : 480;
+        const nextValue = Number.isFinite(fromOverride) && fromOverride > 0 ? fromOverride : fallback;
+        liveSectionHeightInput.value = String(Math.max(160, Math.min(1400, nextValue)));
+      }
+    }
+
+    if (liveSectionHeightLabel instanceof HTMLElement) {
+      if (!canEditSection) {
+        liveSectionHeightLabel.textContent = "Section min height: auto";
+      } else if (liveSectionHeightInput instanceof HTMLInputElement) {
+        liveSectionHeightLabel.textContent = `Section min height: ${liveSectionHeightInput.value}px`;
+      }
     }
 
     liveElementEditorRoot.classList.toggle("is-generic-selection", hasSelection && !isEditableType);
@@ -1921,6 +2001,91 @@
     updateLiveEditorQuickbarPosition();
     updateLiveEditorSelectionOverlay();
     setLiveEditorStatus(`Normalized spacing for ${resetCount} sibling layer${resetCount === 1 ? "" : "s"} on ${profile}.`, "success");
+    return true;
+  };
+
+  const getSelectedSectionNode = () => {
+    if (!(selectedNode instanceof HTMLElement)) return null;
+    if (selectedNode.matches("section[data-layout-key]")) return selectedNode;
+    const closestSection = selectedNode.closest("section[data-layout-key]");
+    return closestSection instanceof HTMLElement ? closestSection : null;
+  };
+
+  const saveSelectedSectionMinHeight = async () => {
+    const sectionNode = getSelectedSectionNode();
+    if (!(sectionNode instanceof HTMLElement) || !(liveSectionHeightInput instanceof HTMLInputElement)) {
+      setLiveEditorStatus("Select a section first to adjust height.", "info");
+      return;
+    }
+
+    const sectionKey = sectionNode.getAttribute("data-layout-key") || "";
+    if (!sectionKey) return;
+
+    const profile = getActiveViewportProfile();
+    const nextValue = Number.parseInt(liveSectionHeightInput.value, 10);
+    if (!Number.isFinite(nextValue) || nextValue < 160) {
+      setLiveEditorStatus("Section min height must be at least 160px.", "error");
+      return;
+    }
+
+    const key = `style.${sectionKey}.minHeight.${profile}`;
+    const save = await saveLiveOverride({ key, value: String(nextValue), type: "text", language: "all" });
+    if (!save.ok) {
+      setLiveEditorStatus(`Height save failed: ${save.message}`, "error");
+      return;
+    }
+
+    if (!siteContentOverrides.textByKey[key]) {
+      siteContentOverrides.textByKey[key] = {};
+    }
+    siteContentOverrides.textByKey[key].all = String(nextValue);
+
+    applyLayoutOverrides();
+    updateLiveElementEditorPanel();
+    setLiveEditorStatus(`Saved section min height ${nextValue}px on ${profile}.`, "success");
+  };
+
+  const addSectionNearSelected = async (position) => {
+    const sectionNode = getSelectedSectionNode();
+    if (!(sectionNode instanceof HTMLElement)) {
+      setLiveEditorStatus("Select a section first.", "info");
+      return false;
+    }
+
+    const sectionKey = sectionNode.getAttribute("data-layout-key") || "";
+    if (!sectionKey) return false;
+
+    setSelectedNode(sectionNode, sectionKey);
+    await duplicateSelectedNode();
+
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Could not create a new section.", "error");
+      return false;
+    }
+
+    if (position === "above") {
+      await moveSelectedNodeInFlow("up");
+    }
+
+    setLiveEditorStatus(`Added section ${position === "above" ? "above" : "below"}.`, "success");
+    return true;
+  };
+
+  const removeSelectedSection = async () => {
+    const sectionNode = getSelectedSectionNode();
+    if (!(sectionNode instanceof HTMLElement)) {
+      setLiveEditorStatus("Select a section first.", "info");
+      return false;
+    }
+
+    const sectionKey = sectionNode.getAttribute("data-layout-key") || "";
+    if (!sectionKey) return false;
+
+    const confirmed = window.confirm("Remove this section from the current viewport profile?");
+    if (!confirmed) return false;
+
+    setSelectedNode(sectionNode, sectionKey);
+    await removeSelectedNode();
     return true;
   };
 
@@ -2434,7 +2599,8 @@
         ? Math.max(0, Math.round(liveEditorRoot.getBoundingClientRect().width))
         : 0;
       const gutter = 40;
-      const availableWidth = Math.max(320, window.innerWidth - panelWidth - gutter);
+      const dockConsumesWidth = liveEditorDock === "left" || liveEditorDock === "right";
+      const availableWidth = Math.max(320, window.innerWidth - (dockConsumesWidth ? panelWidth : 0) - gutter);
       const ratio = availableWidth / profileWidth;
       return Math.min(1, Math.max(0.55, Number.isFinite(ratio) ? ratio : 1));
     };
@@ -3124,6 +3290,7 @@
 
   const ensureLayoutKeys = () => {
     const layoutSelectors = [
+      "main",
       ".site-header",
       ".hero",
       ".hero-headline",
@@ -3400,6 +3567,18 @@
     });
   }
 
+  if (liveSectionHeightInput instanceof HTMLInputElement) {
+    liveSectionHeightInput.addEventListener("input", () => {
+      if (liveSectionHeightLabel instanceof HTMLElement) {
+        liveSectionHeightLabel.textContent = `Section min height: ${liveSectionHeightInput.value}px`;
+      }
+    });
+
+    liveSectionHeightInput.addEventListener("change", () => {
+      void saveSelectedSectionMinHeight();
+    });
+  }
+
   if (liveMinimapStage instanceof HTMLElement) {
     const onMinimapPointerMove = (event) => {
       if (!minimapPointerDown) return;
@@ -3559,6 +3738,21 @@
 
       if (elementAction === "upload-image") {
         await uploadSelectedElementImageFromPanel();
+        return;
+      }
+
+      if (elementAction === "add-section-above") {
+        await addSectionNearSelected("above");
+        return;
+      }
+
+      if (elementAction === "add-section-below") {
+        await addSectionNearSelected("below");
+        return;
+      }
+
+      if (elementAction === "remove-section") {
+        await removeSelectedSection();
         return;
       }
 
