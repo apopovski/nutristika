@@ -688,6 +688,7 @@
   const LIVE_EDITOR_HUD_VISIBLE_KEY = "nutristika-live-editor-hud-visible";
   const LIVE_EDITOR_DOCK_KEY = "nutristika-live-editor-dock";
   const LIVE_EDITOR_COMPACT_KEY = "nutristika-live-editor-compact";
+  const LIVE_EDITOR_PANEL_OPACITY_KEY = "nutristika-live-editor-panel-opacity";
   const params = new URLSearchParams(window.location.search);
   const inspectorParam = params.get("inspector");
   const editorParam = params.get("editor");
@@ -1219,6 +1220,9 @@
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-compact" data-active="false">Minimal panel: Off</button>
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-hud" data-active="true">Coords popup: On</button>
     </div>
+    <label class="key-inspector__hint" for="live-panel-opacity">Panel transparency</label>
+    <input id="live-panel-opacity" type="range" min="55" max="100" step="1" value="95" />
+    <p class="key-inspector__hint" data-live-panel-opacity-label>Panel opacity: 95%</p>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-autosave" data-active="true">Autosave: On</button>
       <button type="button" class="key-inspector__toggle" data-live-action="save-now">Save now</button>
@@ -1280,6 +1284,8 @@
   const liveMinimapDoc = liveEditorRoot.querySelector("[data-live-minimap-doc]");
   const liveMinimapViewport = liveEditorRoot.querySelector("[data-live-minimap-viewport]");
   const liveMinimapMeta = liveEditorRoot.querySelector("[data-live-minimap-meta]");
+  const livePanelOpacityInput = liveEditorRoot.querySelector("#live-panel-opacity");
+  const livePanelOpacityLabel = liveEditorRoot.querySelector("[data-live-panel-opacity-label]");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
   liveEditorHud.innerHTML = `
@@ -1349,6 +1355,10 @@
     ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "right")
     : "right";
   let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) === "true";
+  const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
+  let liveEditorPanelOpacity = Number.isFinite(savedPanelOpacityRaw)
+    ? Math.min(100, Math.max(55, savedPanelOpacityRaw))
+    : 95;
   const liveMagneticThreshold = 10;
 
   const setLiveEditorStatus = (message, tone = "info") => {
@@ -1470,6 +1480,20 @@
     if (compactButton instanceof HTMLElement) {
       compactButton.setAttribute("data-active", String(liveEditorCompact));
       compactButton.textContent = `Minimal panel: ${liveEditorCompact ? "On" : "Off"}`;
+    }
+  };
+
+  const applyLiveEditorPanelOpacity = () => {
+    const clamped = Math.min(100, Math.max(55, liveEditorPanelOpacity));
+    liveEditorPanelOpacity = clamped;
+    document.body.style.setProperty("--live-editor-panel-opacity", String(clamped / 100));
+
+    if (livePanelOpacityInput instanceof HTMLInputElement) {
+      livePanelOpacityInput.value = String(clamped);
+    }
+
+    if (livePanelOpacityLabel instanceof HTMLElement) {
+      livePanelOpacityLabel.textContent = `Panel opacity: ${clamped}%`;
     }
   };
 
@@ -2733,6 +2757,7 @@
 
     liveEditorViewport = getViewportBreakpoint();
     applyLiveEditorPanelPlacement();
+    applyLiveEditorPanelOpacity();
     updateLiveHudToggleButton();
     if (!liveEditorHudEnabled) {
       liveEditorHud.classList.remove("is-visible");
@@ -2857,6 +2882,21 @@
 
     liveCanvasZoomInput.addEventListener("change", () => {
       setLiveEditorStatus(`Canvas zoom set to ${Math.round(liveCanvasZoom * 100)}%.`, "info");
+    });
+  }
+
+  if (livePanelOpacityInput instanceof HTMLInputElement) {
+    livePanelOpacityInput.addEventListener("input", () => {
+      const parsed = Number.parseInt(livePanelOpacityInput.value, 10);
+      liveEditorPanelOpacity = Number.isFinite(parsed)
+        ? Math.min(100, Math.max(55, parsed))
+        : 95;
+      applyLiveEditorPanelOpacity();
+    });
+
+    livePanelOpacityInput.addEventListener("change", () => {
+      localStorage.setItem(LIVE_EDITOR_PANEL_OPACITY_KEY, String(liveEditorPanelOpacity));
+      setLiveEditorStatus(`Panel opacity set to ${liveEditorPanelOpacity}%.`, "info");
     });
   }
 

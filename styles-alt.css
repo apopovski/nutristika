@@ -1741,10 +1741,14 @@ body.inspector-enabled [data-layout-key] {
   border-bottom: 0;
   border-left-width: 2px;
   border-color: rgba(22, 106, 69, 0.85);
+  background: rgba(255, 255, 255, var(--live-editor-panel-opacity, 0.95));
+  backdrop-filter: blur(10px);
+  transition: background 0.2s ease;
 }
 
 body.live-editor-enabled {
   --live-editor-panel-width: min(430px, 34vw);
+  --live-editor-panel-opacity: 0.95;
 }
 
 body.live-editor-enabled main,
