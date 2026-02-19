@@ -1182,6 +1182,9 @@
       <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1024">Tablet 11"</button>
       <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w390">Phone</button>
     </div>
+    <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-canvas" data-active="false">Canvas mode: Off</button>
+    </div>
     <label class="key-inspector__hint" for="live-resolution-width">Custom preview width</label>
     <input id="live-resolution-width" type="range" min="320" max="1920" step="8" value="1280" />
     <p class="key-inspector__hint" data-live-resolution-label>Resolution: auto</p>
@@ -1264,6 +1267,7 @@
   let nudgeSaveTimer = null;
   let hudHideTimer = null;
   let duplicateCounter = 0;
+  let liveCanvasMode = false;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1586,6 +1590,16 @@
   const applyViewportProfileToBody = () => {
     const profile = getActiveViewportProfile();
     const bp = getBreakpointFromProfile(profile);
+    const profileWidth = (() => {
+      const match = String(profile).match(/^w(\d{3,4})$/);
+      if (match) {
+        const parsed = Number.parseInt(match[1], 10);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      if (bp === "mobile") return 390;
+      if (bp === "tablet") return 1024;
+      return 1280;
+    })();
 
     document.body.classList.remove(
       "live-editor-vp-desktop",
@@ -1594,14 +1608,20 @@
       "live-editor-vp-custom"
     );
     document.body.classList.add(`live-editor-vp-${bp}`);
+    document.body.classList.toggle("live-editor-canvas", liveCanvasMode);
+    document.body.style.setProperty("--live-editor-preview-width", `${profileWidth}px`);
 
     const customMatch = String(profile).match(/^w(\d{3,4})$/);
     if (customMatch) {
       document.body.classList.add("live-editor-vp-custom");
-      document.body.style.setProperty("--live-editor-preview-width", `${customMatch[1]}px`);
-    } else {
-      document.body.style.removeProperty("--live-editor-preview-width");
     }
+  };
+
+  const updateCanvasModeButton = () => {
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-canvas"]');
+    if (!(button instanceof HTMLElement)) return;
+    button.setAttribute("data-active", String(liveCanvasMode));
+    button.textContent = `Canvas mode: ${liveCanvasMode ? "On" : "Off"}`;
   };
 
   const updateSelectedTypographyControls = () => {
@@ -1853,6 +1873,7 @@
     updateViewportButtons();
     updateVisibilityButtons();
     updateDragScopeButton();
+    updateCanvasModeButton();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -2042,6 +2063,14 @@
         target.textContent = `Grid: ${active ? "On" : "Off"}`;
       }
       setLiveEditorStatus(`Grid ${active ? "enabled" : "disabled"}`, "info");
+      return;
+    }
+
+    if (action === "toggle-canvas") {
+      liveCanvasMode = !liveCanvasMode;
+      applyViewportProfileToBody();
+      updateCanvasModeButton();
+      setLiveEditorStatus(`Canvas mode ${liveCanvasMode ? "enabled" : "disabled"}.`, "info");
       return;
     }
 

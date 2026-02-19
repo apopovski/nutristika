@@ -2062,6 +2062,31 @@ body.live-editor-enabled.live-editor-vp-custom main {
   margin-inline: auto;
 }
 
+body.live-editor-enabled.live-editor-canvas {
+  background: #d9dde2;
+}
+
+body.live-editor-enabled.live-editor-canvas main,
+body.live-editor-enabled.live-editor-canvas .footer {
+  max-width: var(--live-editor-preview-width, 1280px);
+  margin-inline: auto;
+}
+
+body.live-editor-enabled.live-editor-canvas main {
+  position: relative;
+  margin-top: 1rem;
+  border: 1.5px solid rgba(17, 17, 17, 0.16);
+  border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(17, 17, 17, 0.16);
+  background: radial-gradient(circle at 0% 0%, rgba(255, 143, 43, 0.12), transparent 35%),
+    radial-gradient(circle at 100% 0%, rgba(22, 106, 69, 0.16), transparent 35%), var(--bg);
+}
+
+body.live-editor-enabled.live-editor-canvas .site-header {
+  max-width: var(--live-editor-preview-width, 1280px);
+  margin-inline: auto;
+}
+
 body.live-editor-enabled .hero-headline {
   pointer-events: auto;
 }
