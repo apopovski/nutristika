@@ -1313,6 +1313,14 @@
         <p class="live-sections-navigator__title">Sections</p>
         <p class="live-sections-navigator__hint">Click to jump · Drag to reorder</p>
       </div>
+      <div class="live-sections-navigator__batch" data-live-sections-batch>
+        <p class="live-sections-navigator__count" data-live-sections-count>0 selected</p>
+        <div class="live-sections-navigator__batch-actions">
+          <button type="button" class="live-sections-navigator__batch-btn" data-live-sections-batch-action="show">Show</button>
+          <button type="button" class="live-sections-navigator__batch-btn" data-live-sections-batch-action="hide">Hide</button>
+          <button type="button" class="live-sections-navigator__batch-btn danger" data-live-sections-batch-action="remove">Remove</button>
+        </div>
+      </div>
       <ul class="live-sections-navigator__list" data-live-sections-list></ul>
     </div>
     <div class="live-editor-actions">
@@ -1512,6 +1520,8 @@
   const liveActionSearchInput = liveEditorRoot.querySelector("#live-action-search");
   const liveActionSearchHint = liveEditorRoot.querySelector("[data-live-action-search-hint]");
   const liveSectionsNavigatorRoot = liveEditorRoot.querySelector("[data-live-sections-nav]");
+  const liveSectionsNavigatorBatch = liveEditorRoot.querySelector("[data-live-sections-batch]");
+  const liveSectionsNavigatorCount = liveEditorRoot.querySelector("[data-live-sections-count]");
   const liveSectionsNavigatorList = liveEditorRoot.querySelector("[data-live-sections-list]");
   const liveMinimapRoot = liveEditorRoot.querySelector("[data-live-minimap]");
   const liveMinimapStage = liveEditorRoot.querySelector("[data-live-minimap-stage]");
@@ -1598,6 +1608,8 @@
   let hudHideTimer = null;
   let duplicateCounter = 0;
   let liveSectionsNavigatorDragKey = "";
+  let liveSectionsMultiSelectAnchorKey = "";
+  const liveSectionsSelectedKeys = new Set();
   let liveCanvasMode = false;
   let liveCanvasZoom = 1;
   let liveCanvasZoomMode = "1";
@@ -1858,6 +1870,69 @@
     setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} section on ${profile}.`, "success");
   };
 
+  const setSectionVisibilityByKey = async (sectionKey, hidden) => {
+    if (!sectionKey) return;
+    const profile = getActiveViewportProfile();
+    const hiddenKey = `layout.${sectionKey}.hidden.${profile}`;
+
+    if (hidden) {
+      await saveLiveOverride({ key: hiddenKey, value: "1", type: "text", language: "all" });
+      if (!siteContentOverrides.textByKey[hiddenKey]) {
+        siteContentOverrides.textByKey[hiddenKey] = {};
+      }
+      siteContentOverrides.textByKey[hiddenKey].all = "1";
+      return;
+    }
+
+    await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
+    delete siteContentOverrides.textByKey[hiddenKey];
+  };
+
+  const removeSectionByKey = async (sectionKey) => {
+    if (!sectionKey) return false;
+    const section = document.querySelector(`section[data-layout-key="${sectionKey}"]`);
+    if (!(section instanceof HTMLElement)) return false;
+
+    const dupId = section.getAttribute("data-dup-id") || "";
+    if (dupId) {
+      const htmlKey = `dup.node.${dupId}.html`;
+      const parentKeyStore = `dup.node.${dupId}.parent`;
+      const afterKeyStore = `dup.node.${dupId}.after`;
+      const placeKeyStore = `dup.node.${dupId}.place`;
+
+      await deleteLiveOverride({ key: htmlKey, type: "text", language: "all" });
+      await deleteLiveOverride({ key: parentKeyStore, type: "text", language: "all" });
+      await deleteLiveOverride({ key: afterKeyStore, type: "text", language: "all" });
+      await deleteLiveOverride({ key: placeKeyStore, type: "text", language: "all" });
+
+      delete siteContentOverrides.textByKey[htmlKey];
+      delete siteContentOverrides.textByKey[parentKeyStore];
+      delete siteContentOverrides.textByKey[afterKeyStore];
+      delete siteContentOverrides.textByKey[placeKeyStore];
+      section.remove();
+      return true;
+    }
+
+    await setSectionVisibilityByKey(sectionKey, true);
+    return true;
+  };
+
+  const getNavigatorSectionKeys = () => getTopLevelEditableSections()
+    .map((section) => section.getAttribute("data-layout-key") || "")
+    .filter(Boolean);
+
+  const updateLiveSectionsBatchUi = () => {
+    if (!(liveSectionsNavigatorBatch instanceof HTMLElement) || !(liveSectionsNavigatorCount instanceof HTMLElement)) return;
+    const count = liveSectionsSelectedKeys.size;
+    liveSectionsNavigatorCount.textContent = `${count} selected`;
+    liveSectionsNavigatorBatch.classList.toggle("is-active", count > 0);
+    liveSectionsNavigatorBatch.querySelectorAll("[data-live-sections-batch-action]").forEach((node) => {
+      if (node instanceof HTMLButtonElement) {
+        node.disabled = count === 0;
+      }
+    });
+  };
+
   const renderLiveSectionsNavigator = () => {
     if (!(liveSectionsNavigatorList instanceof HTMLElement)) return;
 
@@ -1871,6 +1946,10 @@
     const selectedSectionKey = selectedSection instanceof HTMLElement
       ? (selectedSection.getAttribute("data-layout-key") || "")
       : "";
+
+    if (!liveSectionsSelectedKeys.size && selectedSectionKey) {
+      liveSectionsSelectedKeys.add(selectedSectionKey);
+    }
 
     liveSectionsNavigatorList.innerHTML = "";
 
@@ -1891,6 +1970,7 @@
       item.setAttribute("data-section-key", key);
       item.setAttribute("draggable", "true");
       item.classList.toggle("is-selected", key === selectedSectionKey);
+      item.classList.toggle("is-multi-selected", liveSectionsSelectedKeys.has(key));
 
       item.innerHTML = `
         <span class="live-sections-navigator__drag" aria-hidden="true">⋮⋮</span>
@@ -1907,6 +1987,8 @@
 
       liveSectionsNavigatorList.appendChild(item);
     });
+
+    updateLiveSectionsBatchUi();
   };
 
   const applyLiveEditorPanelOpacity = () => {
@@ -3734,6 +3816,44 @@
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
 
+      const batchButton = target.closest("[data-live-sections-batch-action]");
+      if (batchButton instanceof HTMLElement) {
+        const action = batchButton.getAttribute("data-live-sections-batch-action") || "";
+        const keys = [...liveSectionsSelectedKeys];
+        if (!keys.length) return;
+
+        if (action === "show" || action === "hide") {
+          const hidden = action === "hide";
+          void (async () => {
+            for (const key of keys) {
+              await setSectionVisibilityByKey(key, hidden);
+            }
+            applyLayoutOverrides();
+            renderLiveSectionsNavigator();
+            setLiveEditorStatus(`${hidden ? "Hidden" : "Shown"} ${keys.length} section${keys.length === 1 ? "" : "s"}.`, "success");
+          })();
+          return;
+        }
+
+        if (action === "remove") {
+          const confirmed = window.confirm(`Remove ${keys.length} selected section${keys.length === 1 ? "" : "s"}?`);
+          if (!confirmed) return;
+
+          void (async () => {
+            let removed = 0;
+            for (const key of keys) {
+              const done = await removeSectionByKey(key);
+              if (done) removed += 1;
+            }
+            liveSectionsSelectedKeys.clear();
+            applyLayoutOverrides();
+            renderLiveSectionsNavigator();
+            setLiveEditorStatus(`Removed ${removed} section${removed === 1 ? "" : "s"}.`, "success");
+          })();
+          return;
+        }
+      }
+
       const actionButton = target.closest("[data-live-section-action]");
       if (actionButton instanceof HTMLElement) {
         const action = actionButton.getAttribute("data-live-section-action") || "";
@@ -3759,7 +3879,7 @@
         }
 
         if (action === "remove") {
-          void removeSelectedSection().then(() => {
+          void removeSectionByKey(key).then(() => {
             renderLiveSectionsNavigator();
           });
           return;
@@ -3775,9 +3895,36 @@
       const section = document.querySelector(`section[data-layout-key="${key}"]`);
       if (!(section instanceof HTMLElement)) return;
 
+      const isRangeSelect = event.shiftKey;
+      const isAdditive = event.metaKey || event.ctrlKey;
+
+      if (isRangeSelect && liveSectionsMultiSelectAnchorKey) {
+        const keys = getNavigatorSectionKeys();
+        const anchorIndex = keys.indexOf(liveSectionsMultiSelectAnchorKey);
+        const targetIndex = keys.indexOf(key);
+        if (anchorIndex >= 0 && targetIndex >= 0) {
+          const [start, end] = anchorIndex < targetIndex
+            ? [anchorIndex, targetIndex]
+            : [targetIndex, anchorIndex];
+          liveSectionsSelectedKeys.clear();
+          keys.slice(start, end + 1).forEach((k) => liveSectionsSelectedKeys.add(k));
+        }
+      } else if (isAdditive) {
+        if (liveSectionsSelectedKeys.has(key)) {
+          liveSectionsSelectedKeys.delete(key);
+        } else {
+          liveSectionsSelectedKeys.add(key);
+        }
+        liveSectionsMultiSelectAnchorKey = key;
+      } else {
+        liveSectionsSelectedKeys.clear();
+        liveSectionsSelectedKeys.add(key);
+        liveSectionsMultiSelectAnchorKey = key;
+      }
+
       setSelectedNode(section, key);
       section.scrollIntoView({ behavior: "smooth", block: "center" });
-      setLiveEditorStatus(`Jumped to section: ${getSectionDisplayName(section)}`, "info");
+      setLiveEditorStatus(`Jumped to section: ${getSectionDisplayName(section)} · ${liveSectionsSelectedKeys.size} selected`, "info");
     });
 
     liveSectionsNavigatorList.addEventListener("dragstart", (event) => {
