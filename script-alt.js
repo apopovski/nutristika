@@ -1194,6 +1194,16 @@
     <label class="key-inspector__hint" for="live-canvas-zoom-range">Canvas zoom slider</label>
     <input id="live-canvas-zoom-range" type="range" min="55" max="100" step="5" value="100" />
     <p class="key-inspector__hint" data-live-canvas-zoom-label>Canvas zoom: 100% · ⌘/Ctrl +/-/0</p>
+    <div class="live-editor-minimap" data-live-minimap>
+      <div class="live-editor-minimap__head">
+        <p class="live-editor-minimap__title">Minimap</p>
+        <p class="live-editor-minimap__meta" data-live-minimap-meta>Canvas pan</p>
+      </div>
+      <div class="live-editor-minimap__stage" data-live-minimap-stage>
+        <div class="live-editor-minimap__doc" data-live-minimap-doc></div>
+        <div class="live-editor-minimap__viewport" data-live-minimap-viewport></div>
+      </div>
+    </div>
     <label class="key-inspector__hint" for="live-resolution-width">Custom preview width</label>
     <input id="live-resolution-width" type="range" min="320" max="1920" step="8" value="1280" />
     <p class="key-inspector__hint" data-live-resolution-label>Resolution: auto</p>
@@ -1253,6 +1263,11 @@
   const liveFontSizeLabel = liveEditorRoot.querySelector("[data-live-font-size-label]");
   const liveCanvasZoomInput = liveEditorRoot.querySelector("#live-canvas-zoom-range");
   const liveCanvasZoomLabel = liveEditorRoot.querySelector("[data-live-canvas-zoom-label]");
+  const liveMinimapRoot = liveEditorRoot.querySelector("[data-live-minimap]");
+  const liveMinimapStage = liveEditorRoot.querySelector("[data-live-minimap-stage]");
+  const liveMinimapDoc = liveEditorRoot.querySelector("[data-live-minimap-doc]");
+  const liveMinimapViewport = liveEditorRoot.querySelector("[data-live-minimap-viewport]");
+  const liveMinimapMeta = liveEditorRoot.querySelector("[data-live-minimap-meta]");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
   liveEditorHud.innerHTML = `
@@ -1281,6 +1296,7 @@
   let liveCanvasMode = false;
   let liveCanvasZoom = 1;
   let liveCanvasZoomMode = "1";
+  let minimapPointerDown = false;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1662,6 +1678,109 @@
     button.textContent = `Canvas mode: ${liveCanvasMode ? "On" : "Off"}`;
   };
 
+  const clampBetween = (value, min, max) => Math.min(max, Math.max(min, value));
+
+  const updateCanvasMinimap = () => {
+    if (!(liveMinimapRoot instanceof HTMLElement)
+      || !(liveMinimapStage instanceof HTMLElement)
+      || !(liveMinimapDoc instanceof HTMLElement)
+      || !(liveMinimapViewport instanceof HTMLElement)) {
+      return;
+    }
+
+    if (!liveCanvasMode) {
+      liveMinimapRoot.classList.add("is-hidden");
+      return;
+    }
+
+    liveMinimapRoot.classList.remove("is-hidden");
+
+    const stageRect = liveMinimapStage.getBoundingClientRect();
+    const stageWidth = Math.max(1, Math.round(stageRect.width));
+    const stageHeight = Math.max(1, Math.round(stageRect.height));
+
+    const docEl = document.documentElement;
+    const bodyEl = document.body;
+    const contentWidth = Math.max(
+      docEl.scrollWidth,
+      bodyEl?.scrollWidth || 0,
+      window.innerWidth
+    );
+    const contentHeight = Math.max(
+      docEl.scrollHeight,
+      bodyEl?.scrollHeight || 0,
+      window.innerHeight
+    );
+
+    const scale = Math.max(0.001, Math.min(stageWidth / contentWidth, stageHeight / contentHeight));
+    const scaledWidth = contentWidth * scale;
+    const scaledHeight = contentHeight * scale;
+    const offsetX = (stageWidth - scaledWidth) / 2;
+    const offsetY = (stageHeight - scaledHeight) / 2;
+
+    liveMinimapDoc.style.width = `${scaledWidth}px`;
+    liveMinimapDoc.style.height = `${scaledHeight}px`;
+    liveMinimapDoc.style.left = `${offsetX}px`;
+    liveMinimapDoc.style.top = `${offsetY}px`;
+
+    const viewportWidth = clampBetween(window.innerWidth * scale, 16, scaledWidth);
+    const viewportHeight = clampBetween(window.innerHeight * scale, 16, scaledHeight);
+
+    const maxScrollX = Math.max(0, contentWidth - window.innerWidth);
+    const maxScrollY = Math.max(0, contentHeight - window.innerHeight);
+
+    const viewportLeft = offsetX + (maxScrollX
+      ? (window.scrollX / maxScrollX) * (scaledWidth - viewportWidth)
+      : 0);
+    const viewportTop = offsetY + (maxScrollY
+      ? (window.scrollY / maxScrollY) * (scaledHeight - viewportHeight)
+      : 0);
+
+    liveMinimapViewport.style.width = `${viewportWidth}px`;
+    liveMinimapViewport.style.height = `${viewportHeight}px`;
+    liveMinimapViewport.style.left = `${viewportLeft}px`;
+    liveMinimapViewport.style.top = `${viewportTop}px`;
+
+    liveMinimapStage.dataset.mapScale = String(scale);
+    liveMinimapStage.dataset.mapOffsetX = String(offsetX);
+    liveMinimapStage.dataset.mapOffsetY = String(offsetY);
+    liveMinimapStage.dataset.mapContentWidth = String(contentWidth);
+    liveMinimapStage.dataset.mapContentHeight = String(contentHeight);
+
+    if (liveMinimapMeta instanceof HTMLElement) {
+      liveMinimapMeta.textContent = `Zoom ${Math.round(liveCanvasZoom * 100)}% · Y ${Math.round(window.scrollY)}px`;
+    }
+  };
+
+  const panCanvasFromMinimapPointer = (clientX, clientY) => {
+    if (!(liveMinimapStage instanceof HTMLElement)) return;
+
+    const scale = Number.parseFloat(liveMinimapStage.dataset.mapScale || "");
+    const offsetX = Number.parseFloat(liveMinimapStage.dataset.mapOffsetX || "");
+    const offsetY = Number.parseFloat(liveMinimapStage.dataset.mapOffsetY || "");
+    const contentWidth = Number.parseFloat(liveMinimapStage.dataset.mapContentWidth || "");
+    const contentHeight = Number.parseFloat(liveMinimapStage.dataset.mapContentHeight || "");
+
+    if (![scale, offsetX, offsetY, contentWidth, contentHeight].every(Number.isFinite) || scale <= 0) {
+      return;
+    }
+
+    const rect = liveMinimapStage.getBoundingClientRect();
+    const localX = clampBetween(clientX - rect.left, 0, rect.width);
+    const localY = clampBetween(clientY - rect.top, 0, rect.height);
+
+    const docX = clampBetween((localX - offsetX) / scale, 0, contentWidth);
+    const docY = clampBetween((localY - offsetY) / scale, 0, contentHeight);
+
+    const maxScrollX = Math.max(0, contentWidth - window.innerWidth);
+    const maxScrollY = Math.max(0, contentHeight - window.innerHeight);
+
+    const targetX = clampBetween(docX - (window.innerWidth / 2), 0, maxScrollX);
+    const targetY = clampBetween(docY - (window.innerHeight / 2), 0, maxScrollY);
+
+    window.scrollTo({ left: targetX, top: targetY, behavior: "auto" });
+  };
+
   const clampCanvasZoomPercent = (value) => Math.min(100, Math.max(55, value));
 
   const normalizeCanvasZoomMode = (value) => {
@@ -1676,6 +1795,7 @@
     liveCanvasZoomMode = normalizeCanvasZoomMode(nextMode);
     applyViewportProfileToBody();
     updateCanvasZoomButtons();
+    updateCanvasMinimap();
 
     if (!announce) return;
 
@@ -1962,6 +2082,7 @@
     updateDragScopeButton();
     updateCanvasModeButton();
     updateCanvasZoomButtons();
+    updateCanvasMinimap();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -1997,6 +2118,7 @@
       liveEditorViewport = `w${liveResolutionInput.value}`;
       applyViewportProfileToBody();
       updateCanvasZoomButtons();
+      updateCanvasMinimap();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
@@ -2013,6 +2135,34 @@
     liveCanvasZoomInput.addEventListener("change", () => {
       setLiveEditorStatus(`Canvas zoom set to ${Math.round(liveCanvasZoom * 100)}%.`, "info");
     });
+  }
+
+  if (liveMinimapStage instanceof HTMLElement) {
+    const onMinimapPointerMove = (event) => {
+      if (!minimapPointerDown) return;
+      panCanvasFromMinimapPointer(event.clientX, event.clientY);
+    };
+
+    const onMinimapPointerUp = (event) => {
+      minimapPointerDown = false;
+      liveMinimapStage.classList.remove("is-dragging");
+      if (liveMinimapStage.hasPointerCapture(event.pointerId)) {
+        liveMinimapStage.releasePointerCapture(event.pointerId);
+      }
+    };
+
+    liveMinimapStage.addEventListener("pointerdown", (event) => {
+      if (!liveCanvasMode) return;
+      event.preventDefault();
+      minimapPointerDown = true;
+      liveMinimapStage.classList.add("is-dragging");
+      liveMinimapStage.setPointerCapture(event.pointerId);
+      panCanvasFromMinimapPointer(event.clientX, event.clientY);
+    });
+
+    liveMinimapStage.addEventListener("pointermove", onMinimapPointerMove);
+    liveMinimapStage.addEventListener("pointerup", onMinimapPointerUp);
+    liveMinimapStage.addEventListener("pointercancel", onMinimapPointerUp);
   }
 
   if (liveFontFamilyInput instanceof HTMLSelectElement) {
@@ -2137,6 +2287,7 @@
       liveEditorViewport = viewport;
       applyViewportProfileToBody();
       updateCanvasZoomButtons();
+      updateCanvasMinimap();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
@@ -2151,6 +2302,7 @@
       liveEditorViewport = profile;
       applyViewportProfileToBody();
       updateCanvasZoomButtons();
+      updateCanvasMinimap();
       updateViewportButtons();
       updateVisibilityButtons();
       applyLayoutOverrides();
@@ -2173,6 +2325,7 @@
       applyViewportProfileToBody();
       updateCanvasModeButton();
       updateCanvasZoomButtons();
+      updateCanvasMinimap();
       setLiveEditorStatus(`Canvas mode ${liveCanvasMode ? "enabled" : "disabled"}.`, "info");
       return;
     }
@@ -2756,16 +2909,23 @@
     if (editorParam === "1" && liveCanvasZoomMode === "fit") {
       applyViewportProfileToBody();
       updateCanvasZoomButtons();
+      updateCanvasMinimap();
     }
 
     if (editorParam === "1" && liveEditorViewport === "auto") {
       applyViewportProfileToBody();
       updateCanvasZoomButtons();
+      updateCanvasMinimap();
       updateViewportButtons();
       updateVisibilityButtons();
     }
     applyLayoutOverrides();
   });
+
+  window.addEventListener("scroll", () => {
+    if (editorParam !== "1" || !liveCanvasMode) return;
+    updateCanvasMinimap();
+  }, { passive: true });
 
   const setMenuState = (open) => {
     if (!menuToggle || !mobileMenu) return;
