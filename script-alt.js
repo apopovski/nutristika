@@ -711,6 +711,7 @@
   const LIVE_EDITOR_DOCK_KEY = "nutristika-live-editor-dock";
   const LIVE_EDITOR_COMPACT_KEY = "nutristika-live-editor-compact";
   const LIVE_EDITOR_PANEL_OPACITY_KEY = "nutristika-live-editor-panel-opacity";
+  const LIVE_EDITOR_BEGINNER_KEY = "nutristika-live-editor-beginner";
   const params = new URLSearchParams(window.location.search);
   const inspectorParam = params.get("inspector");
   const editorParam = params.get("editor");
@@ -1301,14 +1302,20 @@
   liveEditorRoot.innerHTML = `
     <p class="key-inspector__hint"><strong>Live Editor</strong> — click text/image to edit instantly.</p>
     <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-beginner" data-active="true">Ease mode: On</button>
+    </div>
+    <label class="key-inspector__hint" for="live-action-search">Quick action search</label>
+    <input id="live-action-search" type="search" placeholder="Type: font, section, hide, duplicate..." />
+    <p class="key-inspector__hint" data-live-action-search-hint>Canva-like tip: search an action, then click once.</p>
+    <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="desktop">Desktop</button>
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="tablet">Tablet</button>
       <button type="button" class="key-inspector__toggle" data-live-action="viewport" data-viewport="mobile">Mobile</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid">Grid: Off</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="toggle-snap" data-active="false">Snap: Off</button>
-      <button type="button" class="key-inspector__toggle" data-live-action="toggle-magnetic" data-active="false">Guides: Off</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid" data-live-advanced="true">Grid: Off</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-snap" data-active="false" data-live-advanced="true">Snap: Off</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="toggle-magnetic" data-active="false" data-live-advanced="true">Guides: Off</button>
     </div>
-    <div class="live-editor-actions live-editor-actions--snap-sizes">
+    <div class="live-editor-actions live-editor-actions--snap-sizes" data-live-advanced="true">
       <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="4">Snap 4</button>
       <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="8">Snap 8</button>
       <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="12">Snap 12</button>
@@ -1326,7 +1333,7 @@
     <label class="key-inspector__hint" for="live-canvas-zoom-range">Canvas zoom slider</label>
     <input id="live-canvas-zoom-range" type="range" min="55" max="100" step="5" value="100" />
     <p class="key-inspector__hint" data-live-canvas-zoom-label>Canvas zoom: 100% · ⌘/Ctrl +/-/0</p>
-    <div class="live-editor-minimap" data-live-minimap>
+    <div class="live-editor-minimap" data-live-minimap data-live-advanced="true">
       <div class="live-editor-minimap__head">
         <p class="live-editor-minimap__title">Minimap</p>
         <p class="live-editor-minimap__meta" data-live-minimap-meta>Canvas pan</p>
@@ -1470,7 +1477,7 @@
         <button type="button" class="key-inspector__toggle" data-live-element-action="remove">Remove</button>
       </div>
     </div>
-    <div class="live-editor-history">
+    <div class="live-editor-history" data-live-advanced="true">
       <div class="live-editor-history__head">
         <p class="live-editor-history__title">Recent actions</p>
         <button type="button" class="live-editor-history__clear" data-history-action="clear-reverted">Clear reverted</button>
@@ -1494,6 +1501,8 @@
   const liveFontSizeLabel = liveEditorRoot.querySelector("[data-live-font-size-label]");
   const liveCanvasZoomInput = liveEditorRoot.querySelector("#live-canvas-zoom-range");
   const liveCanvasZoomLabel = liveEditorRoot.querySelector("[data-live-canvas-zoom-label]");
+  const liveActionSearchInput = liveEditorRoot.querySelector("#live-action-search");
+  const liveActionSearchHint = liveEditorRoot.querySelector("[data-live-action-search-hint]");
   const liveMinimapRoot = liveEditorRoot.querySelector("[data-live-minimap]");
   const liveMinimapStage = liveEditorRoot.querySelector("[data-live-minimap-stage]");
   const liveMinimapDoc = liveEditorRoot.querySelector("[data-live-minimap-doc]");
@@ -1590,6 +1599,7 @@
     ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "left")
     : "left";
   let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) === "true";
+  let liveEditorBeginner = localStorage.getItem(LIVE_EDITOR_BEGINNER_KEY) !== "false";
   let selectedNodeDetails = null;
   const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
   let liveEditorPanelOpacity = Number.isFinite(savedPanelOpacityRaw)
@@ -1745,6 +1755,49 @@
       compactButton.setAttribute("data-active", String(liveEditorCompact));
       compactButton.textContent = `Minimal panel: ${liveEditorCompact ? "On" : "Off"}`;
     }
+  };
+
+  const applyLiveEditorBeginnerMode = () => {
+    document.body.classList.toggle("live-editor-beginner", liveEditorBeginner);
+
+    const button = liveEditorRoot.querySelector('[data-live-action="toggle-beginner"]');
+    if (button instanceof HTMLElement) {
+      button.setAttribute("data-active", String(liveEditorBeginner));
+      button.textContent = `Ease mode: ${liveEditorBeginner ? "On" : "Off"}`;
+    }
+
+    if (liveActionSearchHint instanceof HTMLElement) {
+      liveActionSearchHint.textContent = liveEditorBeginner
+        ? "Canva-like tip: search an action, then click once."
+        : "Advanced mode: all controls visible.";
+    }
+  };
+
+  const applyLiveActionSearchFilter = (rawQuery) => {
+    const query = String(rawQuery || "").trim().toLowerCase();
+    const allButtons = [
+      ...liveEditorRoot.querySelectorAll(".key-inspector__toggle"),
+      ...liveEditorRoot.querySelectorAll(".live-section-template-btn"),
+      ...liveEditorRoot.querySelectorAll(".live-editor-history__filter"),
+      ...liveEditorRoot.querySelectorAll(".live-editor-history__clear")
+    ].filter((node) => node instanceof HTMLElement);
+
+    allButtons.forEach((button) => {
+      const text = (button.textContent || "").toLowerCase();
+      const action = (button.getAttribute("data-live-action") || "").toLowerCase();
+      const elementAction = (button.getAttribute("data-live-element-action") || "").toLowerCase();
+      const template = (button.getAttribute("data-live-section-template") || "").toLowerCase();
+      const searchable = `${text} ${action} ${elementAction} ${template}`;
+      const visible = !query || searchable.includes(query);
+      button.classList.toggle("is-filter-hidden", !visible);
+    });
+
+    liveEditorRoot.querySelectorAll(".live-editor-actions, .live-section-template-grid").forEach((group) => {
+      if (!(group instanceof HTMLElement)) return;
+      const hasVisible = [...group.querySelectorAll(".key-inspector__toggle, .live-section-template-btn")]
+        .some((node) => node instanceof HTMLElement && !node.classList.contains("is-filter-hidden"));
+      group.classList.toggle("is-filter-hidden", !hasVisible && Boolean(query));
+    });
   };
 
   const applyLiveEditorPanelOpacity = () => {
@@ -3530,6 +3583,7 @@
     liveCanvasMode = true;
     liveCanvasZoomMode = "fit";
     applyLiveEditorPanelPlacement();
+    applyLiveEditorBeginnerMode();
     applyLiveEditorPanelOpacity();
     updateLiveHudToggleButton();
     if (!liveEditorHudEnabled) {
@@ -3556,6 +3610,12 @@
 
     wireLiveEditableNodes();
     renderLiveActionHistory();
+  }
+
+  if (liveActionSearchInput instanceof HTMLInputElement) {
+    liveActionSearchInput.addEventListener("input", () => {
+      applyLiveActionSearchFilter(liveActionSearchInput.value);
+    });
   }
 
   if (liveEditorHudCopyButton instanceof HTMLButtonElement) {
@@ -4098,6 +4158,14 @@
       updateLiveEditorQuickbarPosition();
       updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`Minimal panel ${liveEditorCompact ? "enabled" : "disabled"}.`, "info");
+      return;
+    }
+
+    if (action === "toggle-beginner") {
+      liveEditorBeginner = !liveEditorBeginner;
+      localStorage.setItem(LIVE_EDITOR_BEGINNER_KEY, String(liveEditorBeginner));
+      applyLiveEditorBeginnerMode();
+      setLiveEditorStatus(`Ease mode ${liveEditorBeginner ? "enabled" : "disabled"}.`, "info");
       return;
     }
 
