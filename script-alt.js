@@ -1255,6 +1255,38 @@
     <label class="key-inspector__hint" for="live-slider-width">Hero slider width</label>
     <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
     <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
+    <div class="live-element-editor" data-live-element-editor>
+      <p class="live-element-editor__title">Element editor</p>
+      <p class="live-element-editor__meta" data-live-element-key>No element selected</p>
+      <p class="live-element-editor__meta" data-live-element-type>Select an element to edit it directly.</p>
+      <div class="live-element-editor__section" data-live-element-section="text">
+        <label class="key-inspector__hint" for="live-element-text">Text content</label>
+        <textarea id="live-element-text" rows="3" placeholder="Edit selected text..."></textarea>
+        <div class="live-editor-actions">
+          <button type="button" class="key-inspector__toggle" data-live-element-action="save-text">Save text</button>
+        </div>
+      </div>
+      <div class="live-element-editor__section" data-live-element-section="image">
+        <label class="key-inspector__hint" for="live-element-image-url">Image URL</label>
+        <input id="live-element-image-url" type="url" placeholder="https://..." />
+        <div class="live-editor-actions">
+          <button type="button" class="key-inspector__toggle" data-live-element-action="save-image-url">Save image URL</button>
+          <button type="button" class="key-inspector__toggle" data-live-element-action="upload-image">Upload + optimize</button>
+        </div>
+      </div>
+      <p class="key-inspector__hint">Move element</p>
+      <div class="live-editor-actions live-editor-actions--move">
+        <button type="button" class="key-inspector__toggle" data-live-element-action="move-up">↑ Up</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="move-down">↓ Down</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="move-left">← Left</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="move-right">→ Right</button>
+      </div>
+      <div class="live-editor-actions">
+        <button type="button" class="key-inspector__toggle" data-live-element-action="toggle-visibility">Hide</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="duplicate">Duplicate</button>
+        <button type="button" class="key-inspector__toggle" data-live-element-action="remove">Remove</button>
+      </div>
+    </div>
     <div class="live-editor-history">
       <div class="live-editor-history__head">
         <p class="live-editor-history__title">Recent actions</p>
@@ -1286,6 +1318,11 @@
   const liveMinimapMeta = liveEditorRoot.querySelector("[data-live-minimap-meta]");
   const livePanelOpacityInput = liveEditorRoot.querySelector("#live-panel-opacity");
   const livePanelOpacityLabel = liveEditorRoot.querySelector("[data-live-panel-opacity-label]");
+  const liveElementEditorRoot = liveEditorRoot.querySelector("[data-live-element-editor]");
+  const liveElementEditorKey = liveEditorRoot.querySelector("[data-live-element-key]");
+  const liveElementEditorType = liveEditorRoot.querySelector("[data-live-element-type]");
+  const liveElementTextInput = liveEditorRoot.querySelector("#live-element-text");
+  const liveElementImageUrlInput = liveEditorRoot.querySelector("#live-element-image-url");
   const liveEditorHud = document.createElement("div");
   liveEditorHud.className = "live-editor-hud";
   liveEditorHud.innerHTML = `
@@ -1356,15 +1393,16 @@
   let liveCanvasMode = false;
   let liveCanvasZoom = 1;
   let liveCanvasZoomMode = "1";
-  let liveSnapEnabled = false;
-  let liveMagneticGuidesEnabled = false;
+  let liveSnapEnabled = true;
+  let liveMagneticGuidesEnabled = true;
   let minimapPointerDown = false;
   let liveSnapGridSize = 8;
   let liveEditorHudEnabled = localStorage.getItem(LIVE_EDITOR_HUD_VISIBLE_KEY) !== "false";
   let liveEditorDock = ["right", "left", "bottom"].includes(localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "")
-    ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "right")
-    : "right";
+    ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "left")
+    : "left";
   let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) === "true";
+  let selectedNodeDetails = null;
   const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
   let liveEditorPanelOpacity = Number.isFinite(savedPanelOpacityRaw)
     ? Math.min(100, Math.max(55, savedPanelOpacityRaw))
@@ -1533,6 +1571,198 @@
     if (livePanelOpacityLabel instanceof HTMLElement) {
       livePanelOpacityLabel.textContent = `Panel opacity: ${clamped}%`;
     }
+  };
+
+  const updateLiveElementEditorPanel = () => {
+    if (!(liveElementEditorKey instanceof HTMLElement)
+      || !(liveElementEditorType instanceof HTMLElement)
+      || !(liveElementTextInput instanceof HTMLTextAreaElement)
+      || !(liveElementImageUrlInput instanceof HTMLInputElement)
+      || !(liveElementEditorRoot instanceof HTMLElement)) {
+      return;
+    }
+
+    const hasSelection = selectedNode instanceof HTMLElement && selectedNodeKey;
+    const details = hasSelection ? (selectedNodeDetails || getInspectorDetails(selectedNode)) : null;
+    const type = details?.type || "none";
+    const canEditText = type === "text" || type === "placeholder" || type === "icon";
+    const canEditImage = type === "image";
+    const isEditableType = canEditText || canEditImage;
+
+    liveElementEditorKey.textContent = hasSelection
+      ? `Key: ${selectedNodeKey}`
+      : "No element selected";
+
+    liveElementEditorType.textContent = hasSelection
+      ? `Type: ${type}`
+      : "Select an element to edit it directly.";
+
+    liveElementTextInput.value = canEditText ? (details?.value || "") : "";
+    liveElementTextInput.disabled = !canEditText;
+
+    liveElementImageUrlInput.value = canEditImage ? (details?.value || "") : "";
+    liveElementImageUrlInput.disabled = !canEditImage;
+
+    liveElementEditorRoot.querySelectorAll("[data-live-element-action]").forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      const action = button.getAttribute("data-live-element-action") || "";
+      button.disabled = !hasSelection;
+      if ((action === "save-text" && !canEditText) || ((action === "save-image-url" || action === "upload-image") && !canEditImage)) {
+        button.disabled = true;
+      }
+    });
+
+    const textSection = liveElementEditorRoot.querySelector('[data-live-element-section="text"]');
+    if (textSection instanceof HTMLElement) {
+      textSection.classList.toggle("is-hidden", !canEditText);
+    }
+
+    const imageSection = liveElementEditorRoot.querySelector('[data-live-element-section="image"]');
+    if (imageSection instanceof HTMLElement) {
+      imageSection.classList.toggle("is-hidden", !canEditImage);
+    }
+
+    liveElementEditorRoot.classList.toggle("is-generic-selection", hasSelection && !isEditableType);
+
+    const toggleButton = liveElementEditorRoot.querySelector('[data-live-element-action="toggle-visibility"]');
+    if (toggleButton instanceof HTMLButtonElement && hasSelection) {
+      toggleButton.textContent = isSelectedNodeHiddenOnActiveProfile() ? "Show" : "Hide";
+    }
+  };
+
+  const saveSelectedElementTextFromPanel = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey || !(liveElementTextInput instanceof HTMLTextAreaElement)) return;
+    if (!selectedNodeDetails || !["text", "placeholder", "icon"].includes(selectedNodeDetails.type)) return;
+
+    const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+    const nextValue = liveElementTextInput.value.trim();
+    const save = await saveLiveOverride({
+      key: selectedNodeDetails.key,
+      value: nextValue,
+      type: "text",
+      language: activeLang
+    });
+
+    if (!save.ok) {
+      setLiveEditorStatus(`Save failed: ${save.message}`, "error");
+      return;
+    }
+
+    if (!siteContentOverrides.textByKey[selectedNodeDetails.key]) {
+      siteContentOverrides.textByKey[selectedNodeDetails.key] = {};
+    }
+    siteContentOverrides.textByKey[selectedNodeDetails.key][activeLang] = nextValue;
+    applyLanguage(activeLang);
+    selectedNodeDetails = getInspectorDetails(selectedNode);
+    updateLiveElementEditorPanel();
+    setLiveEditorStatus(`Saved ${selectedNodeDetails.key} (${activeLang.toUpperCase()})`, "success");
+  };
+
+  const saveSelectedElementImageUrlFromPanel = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey || !(liveElementImageUrlInput instanceof HTMLInputElement)) return;
+    if (!selectedNodeDetails || selectedNodeDetails.type !== "image") return;
+
+    const trimmed = liveElementImageUrlInput.value.trim();
+    if (!trimmed) {
+      const deletion = await deleteLiveOverride({ key: selectedNodeDetails.key, type: "image", language: "all" });
+      if (!deletion.ok) {
+        setLiveEditorStatus(`Delete failed: ${deletion.message}`, "error");
+        return;
+      }
+      delete siteContentOverrides.imageByKey[selectedNodeDetails.key];
+      applyImageOverrides();
+      selectedNodeDetails = getInspectorDetails(selectedNode);
+      updateLiveElementEditorPanel();
+      setLiveEditorStatus(`Deleted image override for ${selectedNodeDetails.key}`, "success");
+      return;
+    }
+
+    if (!/^https?:\/\//i.test(trimmed)) {
+      setLiveEditorStatus("Image URL must start with http:// or https://", "error");
+      return;
+    }
+
+    const save = await saveLiveOverride({ key: selectedNodeDetails.key, value: trimmed, type: "image", language: "all" });
+    if (!save.ok) {
+      setLiveEditorStatus(`Save failed: ${save.message}`, "error");
+      return;
+    }
+
+    siteContentOverrides.imageByKey[selectedNodeDetails.key] = trimmed;
+    applyImageOverrides();
+    selectedNodeDetails = getInspectorDetails(selectedNode);
+    updateLiveElementEditorPanel();
+    setLiveEditorStatus(`Saved image ${selectedNodeDetails.key}`, "success");
+  };
+
+  const uploadSelectedElementImageFromPanel = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) return;
+    if (!selectedNodeDetails || selectedNodeDetails.type !== "image") return;
+
+    try {
+      const file = await selectLocalImageFile();
+      if (!file) {
+        setLiveEditorStatus("Image upload canceled.", "info");
+        return;
+      }
+
+      const optimized = await optimizeImageFileForWeb(file);
+      const save = await saveLiveOverride({
+        key: selectedNodeDetails.key,
+        value: optimized.dataUrl,
+        type: "image",
+        language: "all"
+      });
+
+      if (!save.ok) {
+        setLiveEditorStatus(`Upload failed: ${save.message}`, "error");
+        return;
+      }
+
+      siteContentOverrides.imageByKey[selectedNodeDetails.key] = optimized.dataUrl;
+      applyImageOverrides();
+      selectedNodeDetails = getInspectorDetails(selectedNode);
+      updateLiveElementEditorPanel();
+      setLiveEditorStatus(`Uploaded + optimized ${selectedNodeDetails.key} (${optimized.width}×${optimized.height})`, "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not process selected image.";
+      setLiveEditorStatus(message, "error");
+    }
+  };
+
+  const moveSelectedNodeInFlow = async (direction) => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) return false;
+    if (!(direction === "up" || direction === "down")) return false;
+
+    const parent = selectedNode.parentElement;
+    if (!(parent instanceof HTMLElement)) return false;
+
+    const siblings = [...parent.children].filter((child) => child instanceof HTMLElement);
+    const index = siblings.indexOf(selectedNode);
+    if (index < 0) return false;
+
+    if (direction === "up") {
+      const previous = siblings[index - 1];
+      if (!(previous instanceof HTMLElement)) {
+        setLiveEditorStatus("Already at top of this group.", "info");
+        return true;
+      }
+      parent.insertBefore(selectedNode, previous);
+    } else {
+      const next = siblings[index + 1];
+      if (!(next instanceof HTMLElement)) {
+        setLiveEditorStatus("Already at bottom of this group.", "info");
+        return true;
+      }
+      parent.insertBefore(next, selectedNode);
+    }
+
+    selectedNodeDetails = getInspectorDetails(selectedNode);
+    updateLiveElementEditorPanel();
+    updateLiveEditorQuickbarPosition();
+    updateLiveEditorSelectionOverlay();
+    setLiveEditorStatus(`Moved ${selectedNodeKey} ${direction} in flow for auto spacing/alignment.`, "success");
+    return true;
   };
 
   const hideLiveEditorHudSoon = (delay = 1400) => {
@@ -1770,6 +2000,7 @@
 
     selectedNode = node instanceof HTMLElement ? node : null;
     selectedNodeKey = key || "";
+    selectedNodeDetails = selectedNode ? getInspectorDetails(selectedNode) : null;
 
     if (selectedNode instanceof HTMLElement) {
       selectedNode.setAttribute("data-live-selected", "true");
@@ -1778,6 +2009,7 @@
     }
 
     updateSelectedTypographyControls();
+    updateLiveElementEditorPanel();
     updateLiveEditorQuickbarPosition();
     updateLiveEditorSelectionOverlay();
     if (!(selectedNode instanceof HTMLElement)) {
@@ -2796,6 +3028,8 @@
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
+    liveCanvasMode = true;
+    liveCanvasZoomMode = "fit";
     applyLiveEditorPanelPlacement();
     applyLiveEditorPanelOpacity();
     updateLiveHudToggleButton();
@@ -2812,6 +3046,7 @@
     updateSnapSizeButtons();
     updateCanvasZoomButtons();
     updateCanvasMinimap();
+    updateLiveElementEditorPanel();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -2893,6 +3128,8 @@
       }
 
       applyLayoutOverrides();
+      selectedNodeDetails = getInspectorDetails(selectedNode);
+      updateLiveElementEditorPanel();
       updateLiveEditorQuickbarPosition();
       updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} ${selectedNodeKey} on ${profile}`, "success");
@@ -2953,6 +3190,8 @@
       }
 
       applyLayoutOverrides();
+      selectedNodeDetails = getInspectorDetails(selectedNode);
+      updateLiveElementEditorPanel();
       updateLiveEditorSelectionOverlay();
       updateLiveEditorQuickbarPosition();
       updateLiveEditorContextMenuVisibilityLabel();
@@ -3140,6 +3379,88 @@
       renderLiveActionHistory();
       setLiveEditorStatus(`Reverted: ${entry.label}`, "success");
       return;
+    }
+
+    const elementAction = target.getAttribute("data-live-element-action");
+    if (elementAction) {
+      if (!selectedNodeKey || !(selectedNode instanceof HTMLElement)) {
+        setLiveEditorStatus("Select an element first.", "info");
+        return;
+      }
+
+      if (elementAction === "save-text") {
+        await saveSelectedElementTextFromPanel();
+        return;
+      }
+
+      if (elementAction === "save-image-url") {
+        await saveSelectedElementImageUrlFromPanel();
+        return;
+      }
+
+      if (elementAction === "upload-image") {
+        await uploadSelectedElementImageFromPanel();
+        return;
+      }
+
+      if (elementAction === "move-up") {
+        if (!await moveSelectedNodeInFlow("up")) {
+          nudgeSelectedNode(0, -liveSnapGridSize);
+        }
+        return;
+      }
+
+      if (elementAction === "move-down") {
+        if (!await moveSelectedNodeInFlow("down")) {
+          nudgeSelectedNode(0, liveSnapGridSize);
+        }
+        return;
+      }
+
+      if (elementAction === "move-left") {
+        nudgeSelectedNode(-liveSnapGridSize, 0);
+        return;
+      }
+
+      if (elementAction === "move-right") {
+        nudgeSelectedNode(liveSnapGridSize, 0);
+        return;
+      }
+
+      if (elementAction === "duplicate") {
+        await duplicateSelectedNode();
+        return;
+      }
+
+      if (elementAction === "remove") {
+        await removeSelectedNode();
+        return;
+      }
+
+      if (elementAction === "toggle-visibility") {
+        const profile = getActiveViewportProfile();
+        const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
+        const isHidden = isSelectedNodeHiddenOnActiveProfile();
+
+        if (isHidden) {
+          await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
+          delete siteContentOverrides.textByKey[hiddenKey];
+        } else {
+          await saveLiveOverride({ key: hiddenKey, value: "1", type: "text", language: "all" });
+          if (!siteContentOverrides.textByKey[hiddenKey]) {
+            siteContentOverrides.textByKey[hiddenKey] = {};
+          }
+          siteContentOverrides.textByKey[hiddenKey].all = "1";
+        }
+
+        applyLayoutOverrides();
+        selectedNodeDetails = getInspectorDetails(selectedNode);
+        updateLiveElementEditorPanel();
+        updateLiveEditorQuickbarPosition();
+        updateLiveEditorSelectionOverlay();
+        setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} ${selectedNodeKey} on ${profile}`, "success");
+        return;
+      }
     }
 
     const action = target.getAttribute("data-live-action");
