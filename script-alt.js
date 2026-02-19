@@ -1621,7 +1621,7 @@
   let liveEditorDock = ["right", "left", "bottom"].includes(localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "")
     ? (localStorage.getItem(LIVE_EDITOR_DOCK_KEY) || "left")
     : "left";
-  let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) === "true";
+  let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) !== "false";
   let liveEditorBeginner = localStorage.getItem(LIVE_EDITOR_BEGINNER_KEY) !== "false";
   let selectedNodeDetails = null;
   const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
