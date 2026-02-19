@@ -1793,8 +1793,14 @@ body.inspector-enabled [data-layout-key] {
   color: #d8ff57;
 }
 
-.live-editor-hud__copy {
+.live-editor-hud__actions {
   margin-top: 0.2rem;
+  display: flex;
+  gap: 0.38rem;
+  flex-wrap: wrap;
+}
+
+.live-editor-hud__copy {
   border: 1.5px solid rgba(216, 255, 87, 0.85);
   border-radius: 999px;
   background: rgba(216, 255, 87, 0.12);
@@ -1806,11 +1812,28 @@ body.inspector-enabled [data-layout-key] {
   text-transform: uppercase;
   padding: 0.34rem 0.52rem;
   cursor: pointer;
-  justify-self: start;
 }
 
 .live-editor-hud__copy:hover {
   background: rgba(216, 255, 87, 0.2);
+}
+
+.live-editor-hud__reset {
+  border: 1.5px solid rgba(255, 143, 43, 0.85);
+  border-radius: 999px;
+  background: rgba(255, 143, 43, 0.12);
+  color: #ffe6cc;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.34rem 0.52rem;
+  cursor: pointer;
+}
+
+.live-editor-hud__reset:hover {
+  background: rgba(255, 143, 43, 0.2);
 }
 
 body.live-editor-enabled [data-i18n],

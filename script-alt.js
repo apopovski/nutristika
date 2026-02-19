@@ -978,12 +978,16 @@
   liveEditorHud.innerHTML = `
     <p class="live-editor-hud__key">No selection</p>
     <p class="live-editor-hud__coords">x: 0 · y: 0</p>
-    <button type="button" class="live-editor-hud__copy" data-live-hud-action="copy-coords">Copy coords</button>
+    <div class="live-editor-hud__actions">
+      <button type="button" class="live-editor-hud__copy" data-live-hud-action="copy-coords">Copy coords</button>
+      <button type="button" class="live-editor-hud__reset" data-live-hud-action="reset-coords">Reset 0,0</button>
+    </div>
   `;
 
   const liveEditorHudKey = liveEditorHud.querySelector(".live-editor-hud__key");
   const liveEditorHudCoords = liveEditorHud.querySelector(".live-editor-hud__coords");
   const liveEditorHudCopyButton = liveEditorHud.querySelector('[data-live-hud-action="copy-coords"]');
+  const liveEditorHudResetButton = liveEditorHud.querySelector('[data-live-hud-action="reset-coords"]');
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
@@ -1065,6 +1069,23 @@
     }
 
     setLiveEditorStatus("Could not copy coordinates. Try again.", "error");
+  };
+
+  const resetSelectedCoords = async () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      setLiveEditorStatus("Select an element first to reset coordinates.", "info");
+      return;
+    }
+
+    if (nudgeSaveTimer) {
+      window.clearTimeout(nudgeSaveTimer);
+      nudgeSaveTimer = null;
+    }
+
+    selectedNode.style.transform = "translate(0px, 0px)";
+    showLiveEditorHud({ key: selectedNodeKey, x: 0, y: 0 });
+    await saveLayoutTranslate(selectedNodeKey, selectedNode);
+    setLiveEditorStatus(`Reset ${selectedNodeKey} to 0,0 on ${getActiveBreakpoint()}`, "success");
   };
 
   const setSelectedNode = (node, key) => {
@@ -1337,6 +1358,12 @@
   if (liveEditorHudCopyButton instanceof HTMLButtonElement) {
     liveEditorHudCopyButton.addEventListener("click", () => {
       void copySelectedCoords();
+    });
+  }
+
+  if (liveEditorHudResetButton instanceof HTMLButtonElement) {
+    liveEditorHudResetButton.addEventListener("click", () => {
+      void resetSelectedCoords();
     });
   }
 
