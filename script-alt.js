@@ -978,6 +978,7 @@
   let selectedNode = null;
   let suppressLiveClickUntil = 0;
   let dragScopeMode = "child";
+  let nudgeSaveTimer = null;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1088,6 +1089,35 @@
     }
     siteContentOverrides.textByKey[translateKey].all = `${x},${y}`;
     setLiveEditorStatus(`Saved position (${getActiveBreakpoint()}) for ${key}`, "success");
+  };
+
+  const isTextInputContext = (eventTarget) => {
+    if (!(eventTarget instanceof HTMLElement)) return false;
+    if (eventTarget.isContentEditable) return true;
+
+    const tag = eventTarget.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  };
+
+  const nudgeSelectedNode = (dx, dy) => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) return false;
+
+    const origin = getTranslateFromElement(selectedNode);
+    const nextX = origin.x + dx;
+    const nextY = origin.y + dy;
+    selectedNode.style.transform = `translate(${nextX}px, ${nextY}px)`;
+
+    if (nudgeSaveTimer) {
+      window.clearTimeout(nudgeSaveTimer);
+    }
+
+    nudgeSaveTimer = window.setTimeout(() => {
+      nudgeSaveTimer = null;
+      void saveLayoutTranslate(selectedNodeKey, selectedNode);
+    }, 260);
+
+    setLiveEditorStatus(`Nudged ${selectedNodeKey} to ${nextX},${nextY} (${getActiveBreakpoint()})`, "info");
+    return true;
   };
 
   const attachDragHandler = (el, key) => {
@@ -1699,6 +1729,30 @@
   }, true);
 
   document.addEventListener("keydown", (event) => {
+    if (liveEditorEnabled && event.key.startsWith("Arrow")) {
+      if (liveEditorRoot.contains(event.target)) return;
+      if (isTextInputContext(event.target)) return;
+
+      const step = event.shiftKey ? 10 : 1;
+      let dx = 0;
+      let dy = 0;
+
+      if (event.key === "ArrowLeft") dx = -step;
+      if (event.key === "ArrowRight") dx = step;
+      if (event.key === "ArrowUp") dy = -step;
+      if (event.key === "ArrowDown") dy = step;
+
+      if (dx !== 0 || dy !== 0) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!nudgeSelectedNode(dx, dy)) {
+          setLiveEditorStatus("Select an element first, then use arrow keys.", "info");
+        }
+        return;
+      }
+    }
+
     if (event.key.toLowerCase() === "i" && event.shiftKey && event.altKey) {
       event.preventDefault();
       if (!document.body.contains(inspectorRoot)) {
