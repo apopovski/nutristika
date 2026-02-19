@@ -1604,6 +1604,18 @@
     <button type="button" class="live-editor-context-menu__item" data-live-context-action="reset-pos">Reset position</button>
     <button type="button" class="live-editor-context-menu__item danger" data-live-context-action="remove">Remove</button>
   `;
+  const liveEditorCommandPalette = document.createElement("div");
+  liveEditorCommandPalette.className = "live-editor-command";
+  liveEditorCommandPalette.innerHTML = `
+    <div class="live-editor-command__dialog" role="dialog" aria-modal="true" aria-label="Editor spotlight actions">
+      <label class="live-editor-command__label" for="live-editor-command-input">Spotlight actions</label>
+      <input id="live-editor-command-input" class="live-editor-command__input" type="search" placeholder="Type an action… (e.g. duplicate, section, snap)" autocomplete="off" />
+      <ul class="live-editor-command__list" data-live-command-list></ul>
+      <p class="live-editor-command__hint">Enter run · ↑/↓ navigate · Esc close</p>
+    </div>
+  `;
+  const liveEditorCommandInput = liveEditorCommandPalette.querySelector("#live-editor-command-input");
+  const liveEditorCommandList = liveEditorCommandPalette.querySelector("[data-live-command-list]");
   const liveEditorContextMenuVisibilityButton = liveEditorContextMenu.querySelector('[data-live-context-action="toggle-visibility"]');
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
@@ -1630,6 +1642,9 @@
   let liveEditorCompact = localStorage.getItem(LIVE_EDITOR_COMPACT_KEY) !== "false";
   let liveEditorCollapsed = localStorage.getItem(LIVE_EDITOR_COLLAPSED_KEY) === "true";
   let liveEditorBeginner = localStorage.getItem(LIVE_EDITOR_BEGINNER_KEY) !== "false";
+  let liveEditorCommandOpen = false;
+  let liveEditorCommandActiveIndex = 0;
+  let liveEditorCommandFilteredActions = [];
   let selectedNodeDetails = null;
   const savedPanelOpacityRaw = Number.parseInt(localStorage.getItem(LIVE_EDITOR_PANEL_OPACITY_KEY) || "95", 10);
   let liveEditorPanelOpacity = Number.isFinite(savedPanelOpacityRaw)
@@ -1863,6 +1878,141 @@
     first.focus({ preventScroll: true });
     first.click();
     return true;
+  };
+
+  const getLiveCommandActionItems = () => {
+    const actionButtons = [...liveEditorRoot.querySelectorAll("button")]
+      .filter((node) => node instanceof HTMLButtonElement)
+      .filter((button) => {
+        if (button.disabled) return false;
+        const hasAction = button.hasAttribute("data-live-action")
+          || button.hasAttribute("data-live-element-action")
+          || button.hasAttribute("data-live-section-template")
+          || button.hasAttribute("data-live-sections-batch-action")
+          || button.hasAttribute("data-live-section-action")
+          || button.hasAttribute("data-history-filter")
+          || button.hasAttribute("data-history-action");
+        return hasAction;
+      });
+
+    const dedupe = new Set();
+    return actionButtons
+      .map((button) => {
+        const label = (button.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        const liveAction = button.getAttribute("data-live-action") || "";
+        const elementAction = button.getAttribute("data-live-element-action") || "";
+        const sectionAction = button.getAttribute("data-live-section-action") || "";
+        const batchAction = button.getAttribute("data-live-sections-batch-action") || "";
+        const templateAction = button.getAttribute("data-live-section-template") || "";
+        const historyFilter = button.getAttribute("data-history-filter") || "";
+        const historyAction = button.getAttribute("data-history-action") || "";
+        const key = `${label}|${liveAction}|${elementAction}|${sectionAction}|${batchAction}|${templateAction}|${historyFilter}|${historyAction}`;
+        return {
+          key,
+          label: label || "Action",
+          searchable: `${label} ${liveAction} ${elementAction} ${sectionAction} ${batchAction} ${templateAction} ${historyFilter} ${historyAction}`.toLowerCase(),
+          button
+        };
+      })
+      .filter((item) => {
+        if (!item.label) return false;
+        if (dedupe.has(item.key)) return false;
+        dedupe.add(item.key);
+        return true;
+      });
+  };
+
+  const setLiveCommandActiveItem = (nextIndex) => {
+    if (!(liveEditorCommandList instanceof HTMLElement) || !liveEditorCommandFilteredActions.length) {
+      liveEditorCommandActiveIndex = 0;
+      return;
+    }
+
+    const max = liveEditorCommandFilteredActions.length - 1;
+    const safeIndex = Math.min(max, Math.max(0, nextIndex));
+    liveEditorCommandActiveIndex = safeIndex;
+
+    const rows = [...liveEditorCommandList.querySelectorAll(".live-editor-command__item")]
+      .filter((node) => node instanceof HTMLButtonElement);
+
+    rows.forEach((row, index) => {
+      row.setAttribute("data-active", String(index === safeIndex));
+      if (index === safeIndex) {
+        row.scrollIntoView({ block: "nearest" });
+      }
+    });
+  };
+
+  const runLiveCommandAtIndex = (index) => {
+    const item = liveEditorCommandFilteredActions[index];
+    if (!item || !(item.button instanceof HTMLButtonElement)) {
+      setLiveEditorStatus("No action available for this query.", "info");
+      return false;
+    }
+
+    item.button.click();
+    return true;
+  };
+
+  const renderLiveCommandPalette = (rawQuery = "") => {
+    if (!(liveEditorCommandList instanceof HTMLElement)) return;
+    const query = String(rawQuery || "").trim().toLowerCase();
+    const all = getLiveCommandActionItems();
+    liveEditorCommandFilteredActions = query
+      ? all.filter((item) => item.searchable.includes(query))
+      : all;
+
+    liveEditorCommandList.innerHTML = "";
+
+    if (!liveEditorCommandFilteredActions.length) {
+      const empty = document.createElement("li");
+      empty.className = "live-editor-command__empty";
+      empty.textContent = "No matching actions";
+      liveEditorCommandList.appendChild(empty);
+      liveEditorCommandActiveIndex = 0;
+      return;
+    }
+
+    liveEditorCommandFilteredActions.forEach((item, index) => {
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "live-editor-command__item";
+      button.setAttribute("data-live-command-index", String(index));
+      button.setAttribute("data-active", String(index === 0));
+      button.textContent = item.label;
+      li.appendChild(button);
+      liveEditorCommandList.appendChild(li);
+    });
+
+    setLiveCommandActiveItem(0);
+  };
+
+  const closeLiveCommandPalette = ({ focusSearch = false } = {}) => {
+    if (!liveEditorCommandOpen) return;
+    liveEditorCommandOpen = false;
+    liveEditorCommandPalette.classList.remove("is-visible");
+    document.body.classList.remove("live-editor-command-open");
+
+    if (focusSearch && liveActionSearchInput instanceof HTMLInputElement) {
+      liveActionSearchInput.focus({ preventScroll: true });
+    }
+  };
+
+  const openLiveCommandPalette = () => {
+    if (!(liveEditorCommandInput instanceof HTMLInputElement)) return;
+    liveEditorCommandOpen = true;
+    liveEditorCommandPalette.classList.add("is-visible");
+    document.body.classList.add("live-editor-command-open");
+    liveEditorCommandInput.value = "";
+    renderLiveCommandPalette("");
+    window.requestAnimationFrame(() => {
+      liveEditorCommandInput.focus({ preventScroll: true });
+      liveEditorCommandInput.select();
+    });
+    setLiveEditorStatus("Spotlight open — search and press Enter.", "info");
   };
 
   const applyLiveEditorCollapsedState = () => {
@@ -3824,6 +3974,7 @@
     document.body.appendChild(liveEditorSpacingHorizontal);
     document.body.appendChild(liveEditorSpacingVertical);
     document.body.appendChild(liveEditorContextMenu);
+    document.body.appendChild(liveEditorCommandPalette);
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
@@ -3879,6 +4030,64 @@
         liveActionSearchInput.value = "";
         applyLiveActionSearchFilter("");
         setLiveEditorStatus("Quick action search cleared.", "info");
+      }
+    });
+  }
+
+  if (liveEditorCommandPalette instanceof HTMLElement) {
+    liveEditorCommandPalette.addEventListener("click", (event) => {
+      if (event.target === liveEditorCommandPalette) {
+        closeLiveCommandPalette({ focusSearch: true });
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const actionRow = target.closest("[data-live-command-index]");
+      if (!(actionRow instanceof HTMLElement)) return;
+
+      const index = Number.parseInt(actionRow.getAttribute("data-live-command-index") || "", 10);
+      if (!Number.isFinite(index)) return;
+
+      const ran = runLiveCommandAtIndex(index);
+      closeLiveCommandPalette({ focusSearch: true });
+      if (!ran) {
+        setLiveEditorStatus("Action unavailable.", "info");
+      }
+    });
+  }
+
+  if (liveEditorCommandInput instanceof HTMLInputElement) {
+    liveEditorCommandInput.addEventListener("input", () => {
+      renderLiveCommandPalette(liveEditorCommandInput.value);
+    });
+
+    liveEditorCommandInput.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setLiveCommandActiveItem(liveEditorCommandActiveIndex + 1);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setLiveCommandActiveItem(liveEditorCommandActiveIndex - 1);
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const ran = runLiveCommandAtIndex(liveEditorCommandActiveIndex);
+        closeLiveCommandPalette({ focusSearch: true });
+        if (!ran) {
+          setLiveEditorStatus("No matching action to run.", "info");
+        }
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeLiveCommandPalette({ focusSearch: true });
       }
     });
   }
@@ -5141,6 +5350,25 @@
   }, true);
 
   document.addEventListener("keydown", (event) => {
+    if (editorParam === "1" && (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (liveEditorCommandOpen) {
+        closeLiveCommandPalette({ focusSearch: true });
+      } else {
+        openLiveCommandPalette();
+      }
+      return;
+    }
+
+    if (liveEditorCommandOpen && event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeLiveCommandPalette({ focusSearch: true });
+      return;
+    }
+
     if (liveEditorEnabled && (event.metaKey || event.ctrlKey) && !event.altKey) {
       if (isTextInputContext(event.target)) return;
 
