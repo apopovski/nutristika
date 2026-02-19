@@ -973,6 +973,7 @@
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
+  let suppressLiveClickUntil = 0;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1022,6 +1023,19 @@
     });
   };
 
+  const updateVisibilityButtons = () => {
+    const bp = getActiveBreakpoint();
+    liveEditorRoot.querySelectorAll('[data-live-action="hide-selected"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      button.textContent = `Hide (${bp})`;
+    });
+
+    liveEditorRoot.querySelectorAll('[data-live-action="show-selected"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      button.textContent = `Show (${bp})`;
+    });
+  };
+
   const saveLayoutTranslate = async (key, el) => {
     if (!(el instanceof HTMLElement) || !key) return;
 
@@ -1054,10 +1068,14 @@
     let startY = 0;
     let originX = 0;
     let originY = 0;
+    let didMove = false;
 
     const onMove = (moveEvent) => {
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
+      if (!didMove && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        didMove = true;
+      }
       el.style.transform = `translate(${originX + dx}px, ${originY + dy}px)`;
     };
 
@@ -1065,6 +1083,11 @@
       el.removeAttribute("data-dragging");
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+
+      if (didMove) {
+        suppressLiveClickUntil = Date.now() + 260;
+      }
+
       await saveLayoutTranslate(key, el);
     };
 
@@ -1073,9 +1096,14 @@
       if (liveEditorRoot.contains(downEvent.target)) return;
       if (downEvent.button !== 0) return;
 
+      const exactNode = getInspectorNode(downEvent.target);
+      if (exactNode && exactNode !== el) return;
+
       downEvent.preventDefault();
+      downEvent.stopPropagation();
       setSelectedNode(el, key);
       el.setAttribute("data-dragging", "true");
+      didMove = false;
 
       startX = downEvent.clientX;
       startY = downEvent.clientY;
@@ -1144,6 +1172,7 @@
     liveEditorViewport = getViewportBreakpoint();
     document.body.classList.add(`live-editor-vp-${liveEditorViewport}`);
     updateViewportButtons();
+    updateVisibilityButtons();
 
     if (liveEditorEnabled) {
       document.body.classList.add("inspector-enabled");
@@ -1200,6 +1229,7 @@
       document.body.classList.remove("live-editor-vp-desktop", "live-editor-vp-tablet", "live-editor-vp-mobile");
       document.body.classList.add(`live-editor-vp-${viewport}`);
       updateViewportButtons();
+      updateVisibilityButtons();
       applyLayoutOverrides();
       setLiveEditorStatus(`Editing ${viewport} layout`, "info");
       return;
@@ -1300,7 +1330,10 @@
       }
       siteContentOverrides.textByKey[hiddenKey].all = hiddenValue;
       applyLayoutOverrides();
-      setLiveEditorStatus(`${action === "hide-selected" ? "Hidden" : "Shown"} ${selectedNodeKey}`, "success");
+      setLiveEditorStatus(
+        `${action === "hide-selected" ? "Hidden" : "Shown"} ${selectedNodeKey} on ${getActiveBreakpoint()}`,
+        "success"
+      );
       return;
     }
 
@@ -1416,6 +1449,12 @@
 
   document.addEventListener("click", async (event) => {
     if (liveEditorEnabled) {
+      if (Date.now() < suppressLiveClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
       if (liveEditorRoot.contains(event.target) || inspectorRoot.contains(event.target)) return;
 
       const node = getInspectorNode(event.target);
