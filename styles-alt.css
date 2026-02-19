@@ -2122,6 +2122,44 @@ body.live-editor-enabled .footer {
   border-top: 1px dashed rgba(255, 143, 43, 0.95);
 }
 
+.live-editor-spacing {
+  position: fixed;
+  z-index: 127;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.live-editor-spacing.is-active {
+  opacity: 1;
+}
+
+.live-editor-spacing--horizontal {
+  border-top: 1px solid rgba(22, 106, 69, 0.95);
+}
+
+.live-editor-spacing--vertical {
+  border-left: 1px solid rgba(22, 106, 69, 0.95);
+}
+
+.live-editor-spacing__label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(17, 17, 17, 0.2);
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.9);
+  color: #fff;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  padding: 0.15rem 0.38rem;
+  text-transform: uppercase;
+}
+
 .live-editor-quickbar {
   position: fixed;
   z-index: 127;

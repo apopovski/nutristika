@@ -1317,6 +1317,14 @@
   liveEditorGuideVertical.className = "live-editor-guide live-editor-guide--vertical";
   const liveEditorGuideHorizontal = document.createElement("div");
   liveEditorGuideHorizontal.className = "live-editor-guide live-editor-guide--horizontal";
+  const liveEditorSpacingHorizontal = document.createElement("div");
+  liveEditorSpacingHorizontal.className = "live-editor-spacing live-editor-spacing--horizontal";
+  liveEditorSpacingHorizontal.innerHTML = "<span class=\"live-editor-spacing__label\"></span>";
+  const liveEditorSpacingHorizontalLabel = liveEditorSpacingHorizontal.querySelector(".live-editor-spacing__label");
+  const liveEditorSpacingVertical = document.createElement("div");
+  liveEditorSpacingVertical.className = "live-editor-spacing live-editor-spacing--vertical";
+  liveEditorSpacingVertical.innerHTML = "<span class=\"live-editor-spacing__label\"></span>";
+  const liveEditorSpacingVerticalLabel = liveEditorSpacingVertical.querySelector(".live-editor-spacing__label");
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
   let selectedNode = null;
@@ -1667,6 +1675,9 @@
     updateSelectedTypographyControls();
     updateLiveEditorQuickbarPosition();
     updateLiveEditorSelectionOverlay();
+    if (!(selectedNode instanceof HTMLElement)) {
+      clearLiveSpacingIndicators();
+    }
   };
 
   const beginInlineTextEditing = (node, details, activeLang) => {
@@ -2010,6 +2021,134 @@
     setLiveGuideLine(liveEditorGuideHorizontal, false, "y");
   };
 
+  const setSpacingIndicator = ({
+    el,
+    labelEl,
+    active,
+    axis,
+    left = 0,
+    top = 0,
+    length = 0,
+    label = ""
+  }) => {
+    if (!(el instanceof HTMLElement)) return;
+
+    if (!active || !Number.isFinite(length) || length <= 0) {
+      el.classList.remove("is-active");
+      return;
+    }
+
+    el.classList.add("is-active");
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(top)}px`;
+
+    if (axis === "x") {
+      el.style.width = `${Math.max(1, Math.round(length))}px`;
+      el.style.height = "0px";
+    } else {
+      el.style.height = `${Math.max(1, Math.round(length))}px`;
+      el.style.width = "0px";
+    }
+
+    if (labelEl instanceof HTMLElement) {
+      labelEl.textContent = label;
+    }
+  };
+
+  const clearLiveSpacingIndicators = () => {
+    setSpacingIndicator({ el: liveEditorSpacingHorizontal, labelEl: liveEditorSpacingHorizontalLabel, active: false, axis: "x" });
+    setSpacingIndicator({ el: liveEditorSpacingVertical, labelEl: liveEditorSpacingVerticalLabel, active: false, axis: "y" });
+  };
+
+  const updateLiveSpacingIndicators = (movingRect, candidates) => {
+    if (!movingRect || !Array.isArray(candidates) || !candidates.length) {
+      clearLiveSpacingIndicators();
+      return;
+    }
+
+    const maxGap = 240;
+    let bestHorizontal = null;
+    let bestVertical = null;
+
+    candidates.forEach((rect) => {
+      if (!rect
+        || !Number.isFinite(rect.left)
+        || !Number.isFinite(rect.top)
+        || !Number.isFinite(rect.right)
+        || !Number.isFinite(rect.bottom)) {
+        return;
+      }
+
+      const overlapY = Math.min(movingRect.bottom, rect.bottom) - Math.max(movingRect.top, rect.top);
+      if (overlapY > 8) {
+        const y = Math.max(movingRect.top, rect.top) + (overlapY / 2);
+
+        if (movingRect.right <= rect.left) {
+          const gap = rect.left - movingRect.right;
+          if (gap <= maxGap && (!bestHorizontal || gap < bestHorizontal.gap)) {
+            bestHorizontal = { gap, x1: movingRect.right, x2: rect.left, y };
+          }
+        } else if (rect.right <= movingRect.left) {
+          const gap = movingRect.left - rect.right;
+          if (gap <= maxGap && (!bestHorizontal || gap < bestHorizontal.gap)) {
+            bestHorizontal = { gap, x1: rect.right, x2: movingRect.left, y };
+          }
+        }
+      }
+
+      const overlapX = Math.min(movingRect.right, rect.right) - Math.max(movingRect.left, rect.left);
+      if (overlapX > 8) {
+        const x = Math.max(movingRect.left, rect.left) + (overlapX / 2);
+
+        if (movingRect.bottom <= rect.top) {
+          const gap = rect.top - movingRect.bottom;
+          if (gap <= maxGap && (!bestVertical || gap < bestVertical.gap)) {
+            bestVertical = { gap, y1: movingRect.bottom, y2: rect.top, x };
+          }
+        } else if (rect.bottom <= movingRect.top) {
+          const gap = movingRect.top - rect.bottom;
+          if (gap <= maxGap && (!bestVertical || gap < bestVertical.gap)) {
+            bestVertical = { gap, y1: rect.bottom, y2: movingRect.top, x };
+          }
+        }
+      }
+    });
+
+    if (bestHorizontal) {
+      const left = Math.min(bestHorizontal.x1, bestHorizontal.x2);
+      const length = Math.abs(bestHorizontal.x2 - bestHorizontal.x1);
+      setSpacingIndicator({
+        el: liveEditorSpacingHorizontal,
+        labelEl: liveEditorSpacingHorizontalLabel,
+        active: true,
+        axis: "x",
+        left,
+        top: bestHorizontal.y,
+        length,
+        label: `${Math.round(bestHorizontal.gap)}px`
+      });
+    } else {
+      setSpacingIndicator({ el: liveEditorSpacingHorizontal, labelEl: liveEditorSpacingHorizontalLabel, active: false, axis: "x" });
+    }
+
+    if (bestVertical) {
+      const top = Math.min(bestVertical.y1, bestVertical.y2);
+      const length = Math.abs(bestVertical.y2 - bestVertical.y1);
+      setSpacingIndicator({
+        el: liveEditorSpacingVertical,
+        labelEl: liveEditorSpacingVerticalLabel,
+        active: true,
+        axis: "y",
+        left: bestVertical.x,
+        top,
+        length,
+        label: `${Math.round(bestVertical.gap)}px`
+      });
+    } else {
+      setSpacingIndicator({ el: liveEditorSpacingVertical, labelEl: liveEditorSpacingVerticalLabel, active: false, axis: "y" });
+    }
+  };
+
   const updateSnapSizeButtons = () => {
     liveEditorRoot.querySelectorAll('[data-live-action="snap-size"]').forEach((button) => {
       if (!(button instanceof HTMLElement)) return;
@@ -2312,6 +2451,7 @@
     let didMove = false;
     let originRect = null;
     let guideTargets = { x: [], y: [] };
+    let spacingCandidates = [];
 
     const buildGuideTargets = () => {
       if (!(el instanceof HTMLElement)) return { x: [], y: [] };
@@ -2329,6 +2469,15 @@
       });
 
       return { x, y };
+    };
+
+    const buildSpacingCandidates = () => {
+      if (!(el instanceof HTMLElement)) return [];
+
+      return [...document.querySelectorAll("[data-layout-key], [data-i18n], [data-i18n-placeholder], [data-image-key], [data-icon-key]")]
+        .filter((node) => node instanceof HTMLElement && node !== el && node.offsetParent !== null)
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => Number.isFinite(rect.left) && Number.isFinite(rect.top) && Number.isFinite(rect.right) && Number.isFinite(rect.bottom));
     };
 
     const resolveMagneticAlignment = (rawNextX, rawNextY, shiftKey) => {
@@ -2420,6 +2569,20 @@
       showLiveEditorHud({ key, x: nextX, y: nextY });
       updateLiveEditorQuickbarPosition();
       updateLiveEditorSelectionOverlay();
+
+      if (originRect && Number.isFinite(originRect.left) && Number.isFinite(originRect.top)) {
+        const deltaX = nextX - originX;
+        const deltaY = nextY - originY;
+        const movingRect = {
+          left: originRect.left + deltaX,
+          right: originRect.right + deltaX,
+          top: originRect.top + deltaY,
+          bottom: originRect.bottom + deltaY
+        };
+        updateLiveSpacingIndicators(movingRect, spacingCandidates);
+      } else {
+        clearLiveSpacingIndicators();
+      }
     };
 
     const onUp = async () => {
@@ -2427,6 +2590,7 @@
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
       clearLiveGuideLines();
+      clearLiveSpacingIndicators();
 
       if (didMove) {
         suppressLiveClickUntil = Date.now() + 260;
@@ -2459,7 +2623,9 @@
       originY = origin.y;
       originRect = el.getBoundingClientRect();
       guideTargets = buildGuideTargets();
+      spacingCandidates = buildSpacingCandidates();
       clearLiveGuideLines();
+      clearLiveSpacingIndicators();
 
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
@@ -2525,6 +2691,8 @@
     document.body.appendChild(liveEditorSelectionOverlay);
     document.body.appendChild(liveEditorGuideVertical);
     document.body.appendChild(liveEditorGuideHorizontal);
+    document.body.appendChild(liveEditorSpacingHorizontal);
+    document.body.appendChild(liveEditorSpacingVertical);
     document.body.classList.add("live-editor-enabled");
 
     liveEditorViewport = getViewportBreakpoint();
