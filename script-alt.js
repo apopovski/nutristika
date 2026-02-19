@@ -1612,7 +1612,13 @@
       <label class="live-editor-command__label" for="live-editor-command-input">Spotlight actions</label>
       <input id="live-editor-command-input" class="live-editor-command__input" type="search" placeholder="Type an action… (e.g. duplicate, section, snap)" autocomplete="off" />
       <ul class="live-editor-command__list" data-live-command-list></ul>
-      <p class="live-editor-command__hint">Enter run · ↑/↓ navigate · Esc close</p>
+      <div class="live-editor-command__cheats" aria-hidden="true">
+        <span class="live-editor-command__cheat"><kbd>Enter</kbd><span>Run</span></span>
+        <span class="live-editor-command__cheat"><kbd>Tab</kbd><span>Complete</span></span>
+        <span class="live-editor-command__cheat"><kbd>↑</kbd><kbd>↓</kbd><span>Navigate</span></span>
+        <span class="live-editor-command__cheat"><kbd>Esc</kbd><span>Close</span></span>
+      </div>
+      <p class="live-editor-command__hint">Tip: start typing and press Tab to complete the top command.</p>
     </div>
   `;
   const liveEditorCommandInput = liveEditorCommandPalette.querySelector("#live-editor-command-input");
@@ -2134,6 +2140,27 @@
 
     recordLiveCommandUsage(item.commandId || item.key || "");
     item.button.click();
+    return true;
+  };
+
+  const completeLiveCommandFromTopResult = () => {
+    if (!(liveEditorCommandInput instanceof HTMLInputElement)) return false;
+
+    const query = String(liveEditorCommandInput.value || "").trim();
+    if (!query) return false;
+
+    const top = liveEditorCommandFilteredActions[0];
+    const topLabel = String(top?.label || "").trim();
+    if (!topLabel) return false;
+
+    if (topLabel.toLowerCase() === query.toLowerCase()) {
+      setLiveCommandActiveItem(0);
+      return true;
+    }
+
+    liveEditorCommandInput.value = topLabel;
+    renderLiveCommandPalette(topLabel);
+    setLiveEditorStatus(`Completed command: ${topLabel}`, "info");
     return true;
   };
 
@@ -4309,6 +4336,12 @@
         if (!ran) {
           setLiveEditorStatus("No matching action to run.", "info");
         }
+        return;
+      }
+
+      if (event.key === "Tab" && !event.shiftKey) {
+        event.preventDefault();
+        completeLiveCommandFromTopResult();
         return;
       }
 

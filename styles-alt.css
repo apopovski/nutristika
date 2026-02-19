@@ -3420,6 +3420,35 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   letter-spacing: 0.02em;
 }
 
+.live-editor-command__cheats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.26rem 0.34rem;
+  align-items: center;
+}
+
+.live-editor-command__cheat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.54rem;
+  color: #33403b;
+  letter-spacing: 0.02em;
+}
+
+.live-editor-command__cheat kbd {
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f3f1 100%);
+  color: #1f2b26;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.16rem 0.28rem;
+}
+
 body.live-editor-command-open {
   overflow: hidden;
 }
