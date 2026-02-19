@@ -1831,6 +1831,33 @@
       .slice(0, 46);
   };
 
+  const toggleSectionVisibilityByKey = async (sectionKey) => {
+    if (!sectionKey) return;
+    const section = document.querySelector(`section[data-layout-key="${sectionKey}"]`);
+    if (!(section instanceof HTMLElement)) return;
+
+    const profile = getActiveViewportProfile();
+    const hiddenKey = `layout.${sectionKey}.hidden.${profile}`;
+    const isHidden = getTextOverride(hiddenKey, "all") === "1";
+
+    if (isHidden) {
+      await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
+      delete siteContentOverrides.textByKey[hiddenKey];
+    } else {
+      await saveLiveOverride({ key: hiddenKey, value: "1", type: "text", language: "all" });
+      if (!siteContentOverrides.textByKey[hiddenKey]) {
+        siteContentOverrides.textByKey[hiddenKey] = {};
+      }
+      siteContentOverrides.textByKey[hiddenKey].all = "1";
+    }
+
+    applyLayoutOverrides();
+    renderLiveSectionsNavigator();
+    updateLiveEditorSelectionOverlay();
+    updateLiveEditorQuickbarPosition();
+    setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} section on ${profile}.`, "success");
+  };
+
   const renderLiveSectionsNavigator = () => {
     if (!(liveSectionsNavigatorList instanceof HTMLElement)) return;
 
@@ -1871,6 +1898,11 @@
           <span class="live-sections-navigator__index">${index + 1}</span>
           <span class="live-sections-navigator__label">${getSectionDisplayName(section)}</span>
         </button>
+        <div class="live-sections-navigator__actions">
+          <button type="button" class="live-sections-navigator__action" data-live-section-action="duplicate" title="Duplicate section">⧉</button>
+          <button type="button" class="live-sections-navigator__action" data-live-section-action="toggle-visibility" title="Hide/show section">${getTextOverride(`layout.${key}.hidden.${getActiveViewportProfile()}`, "all") === "1" ? "👁" : "🙈"}</button>
+          <button type="button" class="live-sections-navigator__action danger" data-live-section-action="remove" title="Remove section">✕</button>
+        </div>
       `;
 
       liveSectionsNavigatorList.appendChild(item);
@@ -3701,6 +3733,38 @@
     liveSectionsNavigatorRoot.addEventListener("click", (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
+
+      const actionButton = target.closest("[data-live-section-action]");
+      if (actionButton instanceof HTMLElement) {
+        const action = actionButton.getAttribute("data-live-section-action") || "";
+        const item = actionButton.closest(".live-sections-navigator__item");
+        const key = item instanceof HTMLElement ? (item.getAttribute("data-section-key") || "") : "";
+        if (!key) return;
+
+        const section = document.querySelector(`section[data-layout-key="${key}"]`);
+        if (!(section instanceof HTMLElement)) return;
+
+        setSelectedNode(section, key);
+
+        if (action === "duplicate") {
+          void duplicateSelectedNode().then(() => {
+            renderLiveSectionsNavigator();
+          });
+          return;
+        }
+
+        if (action === "toggle-visibility") {
+          void toggleSectionVisibilityByKey(key);
+          return;
+        }
+
+        if (action === "remove") {
+          void removeSelectedSection().then(() => {
+            renderLiveSectionsNavigator();
+          });
+          return;
+        }
+      }
 
       const jumpButton = target.closest("[data-live-section-jump]");
       if (!(jumpButton instanceof HTMLElement)) return;
