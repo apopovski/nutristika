@@ -825,6 +825,8 @@
   let autosaveTimer = null;
   let isFlushingOperations = false;
   const undoStack = [];
+  const liveActionHistory = [];
+  let liveActionHistorySeq = 0;
 
   const buildInverseOperation = (operation) => {
     const previousValue = operation.previousValue;
@@ -869,6 +871,75 @@
     });
   };
 
+  const operationToLocalValue = (operation) => (operation.kind === "save" ? operation.payload.value : null);
+
+  const formatOperationLabel = (operation) => {
+    const kind = operation.kind === "save" ? "Saved" : "Deleted";
+    const key = operation.payload?.key || "(unknown key)";
+    const type = operation.payload?.type || "text";
+
+    if (/^layout\..+\.translate\.(desktop|tablet|mobile)$/.test(key)) {
+      return `${kind} position · ${key}`;
+    }
+
+    if (/^layout\..+\.hidden\.(desktop|tablet|mobile)$/.test(key)) {
+      return `${kind} visibility · ${key}`;
+    }
+
+    return `${kind} ${type} · ${key}`;
+  };
+
+  const renderLiveActionHistory = () => {
+    const list = liveEditorRoot.querySelector(".live-editor-history__list");
+    if (!(list instanceof HTMLElement)) return;
+
+    list.innerHTML = "";
+
+    if (!liveActionHistory.length) {
+      const empty = document.createElement("li");
+      empty.className = "live-editor-history__item is-empty";
+      empty.textContent = "No actions yet.";
+      list.appendChild(empty);
+      return;
+    }
+
+    [...liveActionHistory].reverse().forEach((entry) => {
+      const item = document.createElement("li");
+      item.className = "live-editor-history__item";
+
+      const label = document.createElement("span");
+      label.className = "live-editor-history__label";
+      label.textContent = entry.label;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "live-editor-history__revert";
+      button.setAttribute("data-history-action", "revert");
+      button.setAttribute("data-history-id", String(entry.id));
+      button.textContent = entry.reverted ? "Reverted" : "Revert";
+      button.disabled = Boolean(entry.reverted);
+
+      item.appendChild(label);
+      item.appendChild(button);
+      list.appendChild(item);
+    });
+  };
+
+  const addLiveActionHistoryEntry = (operation, inverseOperation) => {
+    liveActionHistory.push({
+      id: ++liveActionHistorySeq,
+      label: formatOperationLabel(operation),
+      inverseOperation,
+      reverted: false
+    });
+
+    while (liveActionHistory.length > 10) {
+      liveActionHistory.shift();
+    }
+
+    renderLiveActionHistory();
+  };
+
   const flushPendingOperations = async () => {
     if (isFlushingOperations || !pendingOperations.length) return;
     isFlushingOperations = true;
@@ -883,8 +954,10 @@
         break;
       }
 
-      undoStack.push(buildInverseOperation(operation));
+      const inverse = buildInverseOperation(operation);
+      undoStack.push(inverse);
       if (undoStack.length > 60) undoStack.shift();
+      addLiveActionHistoryEntry(operation, inverse);
     }
 
     if (!pendingOperations.length) {
@@ -969,6 +1042,10 @@
     <label class="key-inspector__hint" for="live-slider-width">Hero slider width</label>
     <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
     <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
+    <div class="live-editor-history">
+      <p class="live-editor-history__title">Recent actions</p>
+      <ul class="live-editor-history__list"></ul>
+    </div>
   `;
 
   const liveEditorStatus = liveEditorRoot.querySelector(".key-inspector__status");
@@ -1385,6 +1462,7 @@
     }
 
     wireLiveEditableNodes();
+    renderLiveActionHistory();
   }
 
   if (liveEditorHudCopyButton instanceof HTMLButtonElement) {
@@ -1438,6 +1516,42 @@
   liveEditorRoot.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const historyAction = target.getAttribute("data-history-action");
+    if (historyAction === "revert") {
+      const idRaw = target.getAttribute("data-history-id") || "";
+      const id = Number.parseInt(idRaw, 10);
+      if (!Number.isFinite(id)) return;
+
+      const entry = liveActionHistory.find((item) => item.id === id);
+      if (!entry || entry.reverted) return;
+
+      if (pendingOperations.length) {
+        await flushPendingOperations();
+      }
+
+      const result = await executeOperation(entry.inverseOperation);
+      if (!result.ok) {
+        setLiveEditorStatus(`History revert failed: ${result.message}`, "error");
+        return;
+      }
+
+      setLocalValue({
+        key: entry.inverseOperation.payload.key,
+        type: entry.inverseOperation.payload.type,
+        language: entry.inverseOperation.payload.language,
+        value: operationToLocalValue(entry.inverseOperation)
+      });
+
+      const redo = buildInverseOperation(entry.inverseOperation);
+      undoStack.push(redo);
+      if (undoStack.length > 60) undoStack.shift();
+
+      entry.reverted = true;
+      renderLiveActionHistory();
+      setLiveEditorStatus(`Reverted: ${entry.label}`, "success");
+      return;
+    }
 
     const action = target.getAttribute("data-live-action");
     if (!action) return;

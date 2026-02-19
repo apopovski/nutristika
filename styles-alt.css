@@ -1751,6 +1751,81 @@ body.inspector-enabled [data-layout-key] {
   width: 100%;
 }
 
+.live-editor-history {
+  margin-top: 0.2rem;
+  border: 1.5px solid rgba(17, 17, 17, 0.2);
+  border-radius: 10px;
+  background: rgba(246, 255, 241, 0.75);
+  padding: 0.42rem;
+}
+
+.live-editor-history__title {
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2f2f2f;
+  margin-bottom: 0.32rem;
+}
+
+.live-editor-history__list {
+  list-style: none;
+  display: grid;
+  gap: 0.32rem;
+  max-height: 165px;
+  overflow: auto;
+  padding-right: 0.12rem;
+}
+
+.live-editor-history__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.36rem;
+  align-items: center;
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.3rem 0.34rem;
+}
+
+.live-editor-history__item.is-empty {
+  display: block;
+  color: #5a5a5a;
+  font-size: 0.68rem;
+}
+
+.live-editor-history__label {
+  font-size: 0.63rem;
+  line-height: 1.25;
+  color: #202020;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-editor-history__revert {
+  border: 1.5px solid rgba(22, 106, 69, 0.55);
+  border-radius: 999px;
+  background: rgba(22, 106, 69, 0.09);
+  color: #114f34;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  padding: 0.24rem 0.42rem;
+  cursor: pointer;
+}
+
+.live-editor-history__revert:hover:not(:disabled) {
+  background: rgba(22, 106, 69, 0.16);
+}
+
+.live-editor-history__revert:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .live-editor-hud {
   position: fixed;
   right: 1rem;
