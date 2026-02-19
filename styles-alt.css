@@ -1762,6 +1762,10 @@ body.live-editor-enabled .footer {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.live-editor-actions--snap-sizes {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .live-editor-panel #live-canvas-zoom-range:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -2204,6 +2208,10 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   }
 
   .live-editor-actions--zoom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-editor-actions--snap-sizes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

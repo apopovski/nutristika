@@ -1177,6 +1177,12 @@
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-grid">Grid: Off</button>
       <button type="button" class="key-inspector__toggle" data-live-action="toggle-snap" data-active="false">Snap: Off</button>
     </div>
+    <div class="live-editor-actions live-editor-actions--snap-sizes">
+      <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="4">Snap 4</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="8">Snap 8</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="12">Snap 12</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="snap-size" data-size="24">Snap 24</button>
+    </div>
     <div class="live-editor-actions">
       <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1728">MBP 16"</button>
       <button type="button" class="key-inspector__toggle" data-live-action="viewport-profile" data-profile="w1280">MBP 13"</button>
@@ -1299,7 +1305,7 @@
   let liveCanvasZoomMode = "1";
   let liveSnapEnabled = false;
   let minimapPointerDown = false;
-  const liveSnapGridSize = 8;
+  let liveSnapGridSize = 8;
 
   const setLiveEditorStatus = (message, tone = "info") => {
     if (!liveEditorStatus) return;
@@ -1686,6 +1692,16 @@
     if (!(button instanceof HTMLElement)) return;
     button.setAttribute("data-active", String(liveSnapEnabled));
     button.textContent = `Snap: ${liveSnapEnabled ? `On (${liveSnapGridSize}px)` : "Off"}`;
+  };
+
+  const updateSnapSizeButtons = () => {
+    liveEditorRoot.querySelectorAll('[data-live-action="snap-size"]').forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const value = Number.parseInt(button.getAttribute("data-size") || "", 10);
+      const active = Number.isFinite(value) && value === liveSnapGridSize;
+      button.setAttribute("data-active", String(active));
+      button.setAttribute("aria-pressed", String(active));
+    });
   };
 
   const clampBetween = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -2095,6 +2111,7 @@
     updateDragScopeButton();
     updateCanvasModeButton();
     updateSnapButton();
+    updateSnapSizeButtons();
     updateCanvasZoomButtons();
     updateCanvasMinimap();
 
@@ -2337,12 +2354,23 @@
     if (action === "toggle-snap") {
       liveSnapEnabled = !liveSnapEnabled;
       updateSnapButton();
+      updateSnapSizeButtons();
       setLiveEditorStatus(
         liveSnapEnabled
           ? `Snap enabled (${liveSnapGridSize}px). Hold Shift while dragging to bypass.`
           : "Snap disabled.",
         "info"
       );
+      return;
+    }
+
+    if (action === "snap-size") {
+      const next = Number.parseInt(target.getAttribute("data-size") || "", 10);
+      if (![4, 8, 12, 24].includes(next)) return;
+      liveSnapGridSize = next;
+      updateSnapButton();
+      updateSnapSizeButtons();
+      setLiveEditorStatus(`Snap size set to ${liveSnapGridSize}px.`, "info");
       return;
     }
 
