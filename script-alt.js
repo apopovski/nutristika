@@ -1303,6 +1303,16 @@
     <button type="button" class="live-editor-quickbar__btn" data-live-quick-action="reset-pos">Reset position</button>
   `;
   const liveEditorQuickbarVisibilityButton = liveEditorQuickbar.querySelector('[data-live-quick-action="toggle-visibility"]');
+  const liveEditorSelectionOverlay = document.createElement("div");
+  liveEditorSelectionOverlay.className = "live-editor-selection-overlay";
+  liveEditorSelectionOverlay.innerHTML = `
+    <span class="live-editor-selection-overlay__handle tl" aria-hidden="true"></span>
+    <span class="live-editor-selection-overlay__handle tr" aria-hidden="true"></span>
+    <span class="live-editor-selection-overlay__handle bl" aria-hidden="true"></span>
+    <span class="live-editor-selection-overlay__handle br" aria-hidden="true"></span>
+    <span class="live-editor-selection-overlay__size" aria-hidden="true">0 × 0</span>
+  `;
+  const liveEditorSelectionOverlaySize = liveEditorSelectionOverlay.querySelector(".live-editor-selection-overlay__size");
   const liveEditorGuideVertical = document.createElement("div");
   liveEditorGuideVertical.className = "live-editor-guide live-editor-guide--vertical";
   const liveEditorGuideHorizontal = document.createElement("div");
@@ -1366,6 +1376,34 @@
     liveEditorQuickbar.style.left = `${clampedLeft}px`;
     liveEditorQuickbar.style.top = `${clampedTop}px`;
     liveEditorQuickbar.classList.add("is-visible");
+  };
+
+  const updateLiveEditorSelectionOverlay = () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      liveEditorSelectionOverlay.classList.remove("is-visible");
+      return;
+    }
+
+    const rect = selectedNode.getBoundingClientRect();
+    const visibleEnough = Number.isFinite(rect.width)
+      && Number.isFinite(rect.height)
+      && rect.width > 1
+      && rect.height > 1;
+
+    if (!visibleEnough || selectedNode.offsetParent === null) {
+      liveEditorSelectionOverlay.classList.remove("is-visible");
+      return;
+    }
+
+    liveEditorSelectionOverlay.style.left = `${Math.round(rect.left)}px`;
+    liveEditorSelectionOverlay.style.top = `${Math.round(rect.top)}px`;
+    liveEditorSelectionOverlay.style.width = `${Math.round(rect.width)}px`;
+    liveEditorSelectionOverlay.style.height = `${Math.round(rect.height)}px`;
+    liveEditorSelectionOverlay.classList.add("is-visible");
+
+    if (liveEditorSelectionOverlaySize instanceof HTMLElement) {
+      liveEditorSelectionOverlaySize.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
+    }
   };
 
   const showLiveEditorHud = ({ key, x, y }) => {
@@ -1451,6 +1489,7 @@
     selectedNode.style.transform = "translate(0px, 0px)";
     showLiveEditorHud({ key: selectedNodeKey, x: 0, y: 0 });
     updateLiveEditorQuickbarPosition();
+    updateLiveEditorSelectionOverlay();
     await saveLayoutTranslate(selectedNodeKey, selectedNode);
     setLiveEditorStatus(`Reset ${selectedNodeKey} to 0,0 on ${getActiveBreakpoint()}`, "success");
   };
@@ -1481,6 +1520,7 @@
     applyLayoutOverrides();
     const coords = getTranslateFromElement(selectedNode);
     showLiveEditorHud({ key: selectedNodeKey, x: coords.x, y: coords.y });
+    updateLiveEditorSelectionOverlay();
     hideLiveEditorHudSoon(1800);
     setLiveEditorStatus(`Reset visibility for ${selectedNodeKey} on ${bp}`, "success");
   };
@@ -1626,6 +1666,7 @@
 
     updateSelectedTypographyControls();
     updateLiveEditorQuickbarPosition();
+    updateLiveEditorSelectionOverlay();
   };
 
   const beginInlineTextEditing = (node, details, activeLang) => {
@@ -2246,6 +2287,7 @@
     const nextY = origin.y + dy;
     selectedNode.style.transform = `translate(${nextX}px, ${nextY}px)`;
     showLiveEditorHud({ key: selectedNodeKey, x: nextX, y: nextY });
+    updateLiveEditorSelectionOverlay();
 
     if (nudgeSaveTimer) {
       window.clearTimeout(nudgeSaveTimer);
@@ -2377,6 +2419,7 @@
       el.style.transform = `translate(${nextX}px, ${nextY}px)`;
       showLiveEditorHud({ key, x: nextX, y: nextY });
       updateLiveEditorQuickbarPosition();
+      updateLiveEditorSelectionOverlay();
     };
 
     const onUp = async () => {
@@ -2388,6 +2431,8 @@
       if (didMove) {
         suppressLiveClickUntil = Date.now() + 260;
       }
+
+      updateLiveEditorSelectionOverlay();
 
       await saveLayoutTranslate(key, el);
     };
@@ -2477,6 +2522,7 @@
     document.body.appendChild(liveEditorRoot);
     document.body.appendChild(liveEditorHud);
     document.body.appendChild(liveEditorQuickbar);
+    document.body.appendChild(liveEditorSelectionOverlay);
     document.body.appendChild(liveEditorGuideVertical);
     document.body.appendChild(liveEditorGuideHorizontal);
     document.body.classList.add("live-editor-enabled");
@@ -2574,6 +2620,7 @@
 
       applyLayoutOverrides();
       updateLiveEditorQuickbarPosition();
+      updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} ${selectedNodeKey} on ${profile}`, "success");
     }
   });
@@ -2588,6 +2635,7 @@
       updateVisibilityButtons();
       applyLayoutOverrides();
       updateSelectedTypographyControls();
+      updateLiveEditorSelectionOverlay();
     });
   }
 
@@ -2757,6 +2805,7 @@
       updateVisibilityButtons();
       applyLayoutOverrides();
       updateSelectedTypographyControls();
+      updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`Editing ${viewport} layout`, "info");
       return;
     }
@@ -2772,6 +2821,7 @@
       updateVisibilityButtons();
       applyLayoutOverrides();
       updateSelectedTypographyControls();
+      updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`Editing custom resolution ${profile.slice(1)}px`, "info");
       return;
     }
@@ -2885,6 +2935,7 @@
       await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
       delete siteContentOverrides.textByKey[hiddenKey];
       applyLayoutOverrides();
+      updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(`Restored ${selectedNodeKey} on ${profile}`, "success");
       return;
     }
@@ -2963,6 +3014,7 @@
       }
       siteContentOverrides.textByKey[hiddenKey].all = hiddenValue;
       applyLayoutOverrides();
+      updateLiveEditorSelectionOverlay();
       setLiveEditorStatus(
         `${action === "hide-selected" ? "Hidden" : "Shown"} ${selectedNodeKey} on ${profile}`,
         "success"
@@ -3380,12 +3432,16 @@
     }
     applyLayoutOverrides();
     updateLiveEditorQuickbarPosition();
+    updateLiveEditorSelectionOverlay();
   });
 
   window.addEventListener("scroll", () => {
-    if (editorParam !== "1" || !liveCanvasMode) return;
-    updateCanvasMinimap();
+    if (editorParam !== "1") return;
+    if (liveCanvasMode) {
+      updateCanvasMinimap();
+    }
     updateLiveEditorQuickbarPosition();
+    updateLiveEditorSelectionOverlay();
   }, { passive: true });
 
   const setMenuState = (open) => {
