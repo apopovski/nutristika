@@ -1798,8 +1798,8 @@
 
     if (liveActionSearchHint instanceof HTMLElement) {
       liveActionSearchHint.textContent = liveEditorBeginner
-        ? "Canva-like tip: search an action, then click once."
-        : "Advanced mode: all controls visible.";
+        ? "Canva-like tip: search an action, then click once. ⌘/Ctrl+E toggles panel, ⌘/Ctrl+S saves."
+        : "Advanced mode: all controls visible. ⌘/Ctrl+E toggles panel, ⌘/Ctrl+S saves.";
     }
   };
 
@@ -5117,6 +5117,30 @@
       const isZoomOut = key === "-" || key === "_";
       const isZoomReset = key === "0";
       const isDuplicate = key.toLowerCase() === "d";
+      const isToggleEditor = key.toLowerCase() === "e";
+      const isSaveNow = key.toLowerCase() === "s";
+
+      if (isToggleEditor) {
+        event.preventDefault();
+        event.stopPropagation();
+        liveEditorCollapsed = !liveEditorCollapsed;
+        localStorage.setItem(LIVE_EDITOR_COLLAPSED_KEY, String(liveEditorCollapsed));
+        applyLiveEditorCollapsedState();
+        applyViewportProfileToBody();
+        updateCanvasZoomButtons();
+        updateCanvasMinimap();
+        updateLiveEditorQuickbarPosition();
+        updateLiveEditorSelectionOverlay();
+        setLiveEditorStatus(`Editor ${liveEditorCollapsed ? "collapsed" : "expanded"}.`, "info");
+        return;
+      }
+
+      if (isSaveNow) {
+        event.preventDefault();
+        event.stopPropagation();
+        void flushPendingOperations();
+        return;
+      }
 
       if (isZoomIn || isZoomOut || isZoomReset) {
         event.preventDefault();
