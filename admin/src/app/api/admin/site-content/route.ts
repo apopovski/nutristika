@@ -18,9 +18,23 @@ const json = (payload: object, status = 200) =>
   NextResponse.json(payload, {
     status,
     headers: {
-      "Cache-Control": "no-store"
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization"
     }
   });
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    }
+  });
+}
 
 const parseBearerToken = (request: NextRequest) => {
   const authHeader = request.headers.get("authorization") || request.headers.get("Authorization") || "";
@@ -150,7 +164,9 @@ export async function POST(request: NextRequest) {
     return json({ message: parsed.error }, 400);
   }
 
-  const { error } = await auth.adminClient.from("site_content_overrides").insert(parsed.data);
+  const { error } = await auth.adminClient.from("site_content_overrides").upsert(parsed.data, {
+    onConflict: "key,content_type,language"
+  });
 
   if (error) {
     return json({ message: error.message }, 400);
@@ -191,11 +207,30 @@ export async function DELETE(request: NextRequest) {
   const payload = (await request.json()) as Record<string, unknown>;
   const id = payload.id;
 
-  if (typeof id !== "number" && typeof id !== "string") {
-    return json({ message: "A valid row id is required." }, 400);
+  if (typeof id === "number" || typeof id === "string") {
+    const { error } = await auth.adminClient.from("site_content_overrides").delete().eq("id", id);
+
+    if (error) {
+      return json({ message: error.message }, 400);
+    }
+
+    return json({ ok: true });
   }
 
-  const { error } = await auth.adminClient.from("site_content_overrides").delete().eq("id", id);
+  const key = typeof payload.key === "string" ? payload.key.trim() : "";
+  const contentType = sanitizeContentType(payload.content_type);
+  const language = sanitizeLanguage(payload.language);
+
+  if (!key || !contentType) {
+    return json({ message: "Provide either id, or key + content_type (+ optional language)." }, 400);
+  }
+
+  const { error } = await auth.adminClient
+    .from("site_content_overrides")
+    .delete()
+    .eq("key", key)
+    .eq("content_type", contentType)
+    .eq("language", contentType === "image" ? "all" : language);
 
   if (error) {
     return json({ message: error.message }, 400);

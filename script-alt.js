@@ -176,6 +176,8 @@
     "https://nutristika-admin.vercel.app",
     ""
   ].map((value) => String(value || "").trim()))];
+  const primaryAdminApiBase = (adminApiBaseFromWindow || adminApiBaseFromHtml || "https://nutristika-admin.vercel.app")
+    .replace(/\/$/, "");
 
   let siteContentOverrides = {
     textByKey: {},
@@ -222,6 +224,39 @@
         el.setAttribute("src", overrideSrc.trim());
       }
     });
+
+    const heroWrap = document.querySelector(".hero-f1-slideshow");
+    if (heroWrap) {
+      const existingKeys = new Set(
+        [...heroWrap.querySelectorAll(".hero-slide[data-image-key]")]
+          .map((el) => el.getAttribute("data-image-key"))
+          .filter(Boolean)
+      );
+
+      Object.entries(imageMap)
+        .filter(([key, value]) => /^hero\.slide\.\d+$/.test(key) && typeof value === "string" && value.trim())
+        .sort((a, b) => Number(a[0].split(".").pop()) - Number(b[0].split(".").pop()))
+        .forEach(([key, value]) => {
+          if (existingKeys.has(key)) return;
+          const slide = document.createElement("img");
+          slide.className = "hero-slide";
+          slide.setAttribute("data-image-key", key);
+          slide.setAttribute("src", value.trim());
+          slide.setAttribute("alt", "Hero slide image");
+          heroWrap.appendChild(slide);
+        });
+    }
+
+    const widthOverride = siteContentOverrides?.textByKey?.["hero.slide.width"]?.all;
+    const widthNumber = Number.parseInt(String(widthOverride || ""), 10);
+    const heroFloat = document.querySelector(".hero-float.f1");
+    if (heroFloat instanceof HTMLElement) {
+      if (Number.isFinite(widthNumber) && widthNumber >= 220 && widthNumber <= 1200) {
+        heroFloat.style.width = `${widthNumber}px`;
+      } else {
+        heroFloat.style.removeProperty("width");
+      }
+    }
   };
 
   const fetchFirstJson = async (path) => {
@@ -298,8 +333,21 @@
      0c. Live key inspector (for fast content mapping)
      ---------------------------------------------------------- */
   const INSPECTOR_STORAGE_KEY = "nutristika-key-inspector";
+  const LIVE_EDITOR_TOKEN_KEY = "nutristika-live-editor-token";
   const params = new URLSearchParams(window.location.search);
   const inspectorParam = params.get("inspector");
+  const editorParam = params.get("editor");
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const hashToken = hashParams.get("adminToken");
+
+  if (hashToken) {
+    sessionStorage.setItem(LIVE_EDITOR_TOKEN_KEY, hashToken);
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, "", cleanUrl);
+  }
+
+  const liveEditorToken = sessionStorage.getItem(LIVE_EDITOR_TOKEN_KEY) || "";
+  const liveEditorEnabled = editorParam === "1" && Boolean(liveEditorToken);
 
   if (inspectorParam === "1") {
     localStorage.setItem(INSPECTOR_STORAGE_KEY, "true");
@@ -397,6 +445,173 @@
 
   setInspectorEnabled(isInspectorEnabled);
 
+  const callLiveEditorApi = async (method, payload) => {
+    if (!liveEditorToken) {
+      return { ok: false, message: "Missing editor token. Open page from admin live editor." };
+    }
+
+    const response = await fetch(`${primaryAdminApiBase}/api/admin/site-content`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${liveEditorToken}`
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+      cache: "no-store"
+    });
+
+    const data = await response.json().catch(() => ({}));
+    return {
+      ok: response.ok,
+      data,
+      message: typeof data?.message === "string" ? data.message : "Request failed"
+    };
+  };
+
+  const saveLiveOverride = async ({ key, value, type, language }) =>
+    callLiveEditorApi("POST", {
+      key,
+      value,
+      content_type: type,
+      language: type === "image" ? "all" : (language || "all")
+    });
+
+  const deleteLiveOverride = async ({ key, type, language }) =>
+    callLiveEditorApi("DELETE", {
+      key,
+      content_type: type,
+      language: type === "image" ? "all" : (language || "all")
+    });
+
+  const liveEditorRoot = document.createElement("div");
+  liveEditorRoot.className = "key-inspector live-editor-panel";
+  liveEditorRoot.innerHTML = `
+    <p class="key-inspector__hint"><strong>Live Editor</strong> — click text/image to edit instantly.</p>
+    <div class="live-editor-actions">
+      <button type="button" class="key-inspector__toggle" data-live-action="add-slide">+ Add hero slide</button>
+      <button type="button" class="key-inspector__toggle" data-live-action="remove-slide">− Remove selected slide</button>
+    </div>
+    <label class="key-inspector__hint" for="live-slider-width">Hero slider width</label>
+    <input id="live-slider-width" type="range" min="260" max="980" step="10" value="620" />
+    <p class="key-inspector__status" role="status" aria-live="polite">Live editor idle</p>
+  `;
+
+  const liveEditorStatus = liveEditorRoot.querySelector(".key-inspector__status");
+  const liveWidthInput = liveEditorRoot.querySelector("#live-slider-width");
+  let selectedHeroSlideKey = "";
+
+  const setLiveEditorStatus = (message, tone = "info") => {
+    if (!liveEditorStatus) return;
+    liveEditorStatus.textContent = message;
+    liveEditorStatus.setAttribute("data-tone", tone);
+  };
+
+  if (editorParam === "1") {
+    document.body.appendChild(liveEditorRoot);
+    document.body.classList.add("live-editor-enabled");
+
+    if (liveEditorEnabled) {
+      document.body.classList.add("inspector-enabled");
+      setLiveEditorStatus("Live editor active. Click content to edit.", "success");
+    } else {
+      setLiveEditorStatus("Missing token. Open this page from admin → Open live editor.", "error");
+    }
+  }
+
+  if (liveWidthInput instanceof HTMLInputElement) {
+    const heroFloat = document.querySelector(".hero-float.f1");
+
+    liveWidthInput.addEventListener("input", () => {
+      if (!(heroFloat instanceof HTMLElement)) return;
+      heroFloat.style.width = `${liveWidthInput.value}px`;
+      setLiveEditorStatus(`Slider width: ${liveWidthInput.value}px`, "info");
+    });
+
+    liveWidthInput.addEventListener("change", async () => {
+      if (!liveEditorEnabled) return;
+      const result = await saveLiveOverride({
+        key: "hero.slide.width",
+        value: String(liveWidthInput.value),
+        type: "text",
+        language: "all"
+      });
+
+      if (result.ok) {
+        if (!siteContentOverrides.textByKey["hero.slide.width"]) {
+          siteContentOverrides.textByKey["hero.slide.width"] = {};
+        }
+        siteContentOverrides.textByKey["hero.slide.width"].all = String(liveWidthInput.value);
+        setLiveEditorStatus("Saved slider width.", "success");
+      } else {
+        setLiveEditorStatus(`Save failed: ${result.message}`, "error");
+      }
+    });
+  }
+
+  liveEditorRoot.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const action = target.getAttribute("data-live-action");
+    if (!action) return;
+
+    if (!liveEditorEnabled) {
+      setLiveEditorStatus("Token missing for live edits.", "error");
+      return;
+    }
+
+    if (action === "add-slide") {
+      const url = window.prompt("Paste new hero slide image URL:");
+      if (!url || !/^https?:\/\//i.test(url.trim())) return;
+
+      const heroWrap = document.querySelector(".hero-f1-slideshow");
+      if (!heroWrap) return;
+
+      const keys = [
+        ...[...heroWrap.querySelectorAll(".hero-slide[data-image-key]")].map((el) => el.getAttribute("data-image-key") || ""),
+        ...Object.keys(siteContentOverrides.imageByKey || {})
+      ];
+
+      const maxIndex = keys
+        .map((key) => Number.parseInt((key.match(/^hero\.slide\.(\d+)$/) || [])[1] || "0", 10))
+        .filter((value) => Number.isFinite(value))
+        .reduce((max, value) => Math.max(max, value), 0);
+
+      const nextKey = `hero.slide.${maxIndex + 1}`;
+      const result = await saveLiveOverride({ key: nextKey, value: url.trim(), type: "image", language: "all" });
+
+      if (!result.ok) {
+        setLiveEditorStatus(`Add failed: ${result.message}`, "error");
+        return;
+      }
+
+      siteContentOverrides.imageByKey[nextKey] = url.trim();
+      applyImageOverrides();
+      setLiveEditorStatus(`Added ${nextKey}`, "success");
+      return;
+    }
+
+    if (action === "remove-slide") {
+      if (!selectedHeroSlideKey) {
+        setLiveEditorStatus("Select a hero slide image first.", "info");
+        return;
+      }
+
+      const confirmed = window.confirm(`Remove override for ${selectedHeroSlideKey}?`);
+      if (!confirmed) return;
+
+      const result = await deleteLiveOverride({ key: selectedHeroSlideKey, type: "image", language: "all" });
+      if (!result.ok) {
+        setLiveEditorStatus(`Remove failed: ${result.message}`, "error");
+        return;
+      }
+
+      delete siteContentOverrides.imageByKey[selectedHeroSlideKey];
+      setLiveEditorStatus(`Removed ${selectedHeroSlideKey}. Reloading...`, "success");
+      window.location.reload();
+    }
+  });
+
   const copyInspectorPayload = async (details) => {
     const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
     const payload = JSON.stringify(
@@ -455,6 +670,172 @@
   });
 
   document.addEventListener("click", async (event) => {
+    if (liveEditorEnabled) {
+      if (liveEditorRoot.contains(event.target) || inspectorRoot.contains(event.target)) return;
+
+      const node = getInspectorNode(event.target);
+      if (!node) return;
+
+      const details = getInspectorDetails(node);
+      if (!details.key) return;
+
+      const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+
+      if (details.type === "image") {
+        if (/^hero\.slide\.\d+$/.test(details.key)) {
+          selectedHeroSlideKey = details.key;
+          setLiveEditorStatus(`Selected ${details.key}`, "info");
+        }
+
+        const nextUrl = window.prompt(`Edit image URL for ${details.key}:`, details.value || "");
+        if (nextUrl === null) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        const trimmed = nextUrl.trim();
+        if (!trimmed) {
+          const deletion = await deleteLiveOverride({ key: details.key, type: "image", language: "all" });
+          if (!deletion.ok) {
+            setLiveEditorStatus(`Delete failed: ${deletion.message}`, "error");
+            return;
+          }
+          delete siteContentOverrides.imageByKey[details.key];
+          setLiveEditorStatus(`Deleted ${details.key}. Reloading...`, "success");
+          window.location.reload();
+          return;
+        }
+
+        if (!/^https?:\/\//i.test(trimmed)) {
+          setLiveEditorStatus("Image URL must start with http:// or https://", "error");
+          return;
+        }
+
+        const save = await saveLiveOverride({ key: details.key, value: trimmed, type: "image", language: "all" });
+        if (!save.ok) {
+          setLiveEditorStatus(`Save failed: ${save.message}`, "error");
+          return;
+        }
+
+        siteContentOverrides.imageByKey[details.key] = trimmed;
+        applyImageOverrides();
+        setLiveEditorStatus(`Saved image ${details.key}`, "success");
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      if (details.type === "placeholder") {
+        const placeholderText = window.prompt(`Edit placeholder for ${details.key}:`, details.value || "");
+        if (placeholderText === null) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        const savePlaceholder = await saveLiveOverride({
+          key: details.key,
+          value: placeholderText.trim(),
+          type: "text",
+          language: activeLang
+        });
+
+        if (!savePlaceholder.ok) {
+          setLiveEditorStatus(`Save failed: ${savePlaceholder.message}`, "error");
+          return;
+        }
+
+        if (!siteContentOverrides.textByKey[details.key]) {
+          siteContentOverrides.textByKey[details.key] = {};
+        }
+        siteContentOverrides.textByKey[details.key][activeLang] = placeholderText.trim();
+        applyLanguage(activeLang);
+        setLiveEditorStatus(`Saved ${details.key} (${activeLang.toUpperCase()})`, "success");
+
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      if (!(node instanceof HTMLElement)) return;
+
+      const originalText = node.textContent || "";
+      node.setAttribute("contenteditable", "true");
+      node.classList.add("key-inspector__focus");
+      node.focus();
+
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+
+      setLiveEditorStatus(`Editing ${details.key} — press Enter to save, Esc to cancel.`, "info");
+
+      const cleanup = () => {
+        node.removeAttribute("contenteditable");
+        node.removeEventListener("blur", onBlur);
+        node.removeEventListener("keydown", onKeydown);
+      };
+
+      const cancelEdit = () => {
+        node.textContent = originalText;
+        cleanup();
+        applyLanguage(activeLang);
+        setLiveEditorStatus("Edit canceled.", "info");
+      };
+
+      const saveEdit = async () => {
+        const updatedText = (node.textContent || "").trim();
+        const save = await saveLiveOverride({
+          key: details.key,
+          value: updatedText,
+          type: "text",
+          language: activeLang
+        });
+
+        if (!save.ok) {
+          node.textContent = originalText;
+          cleanup();
+          applyLanguage(activeLang);
+          setLiveEditorStatus(`Save failed: ${save.message}`, "error");
+          return;
+        }
+
+        if (!siteContentOverrides.textByKey[details.key]) {
+          siteContentOverrides.textByKey[details.key] = {};
+        }
+        siteContentOverrides.textByKey[details.key][activeLang] = updatedText;
+        cleanup();
+        applyLanguage(activeLang);
+        setLiveEditorStatus(`Saved ${details.key} (${activeLang.toUpperCase()})`, "success");
+      };
+
+      const onBlur = () => {
+        void saveEdit();
+      };
+
+      const onKeydown = (keyboardEvent) => {
+        if (keyboardEvent.key === "Enter") {
+          keyboardEvent.preventDefault();
+          node.blur();
+        }
+        if (keyboardEvent.key === "Escape") {
+          keyboardEvent.preventDefault();
+          cancelEdit();
+        }
+      };
+
+      node.addEventListener("blur", onBlur, { once: true });
+      node.addEventListener("keydown", onKeydown);
+
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     if (!isInspectorEnabled) return;
     if (inspectorRoot.contains(event.target)) return;
 
