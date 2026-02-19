@@ -1293,6 +1293,16 @@
   const liveEditorHudCopyButton = liveEditorHud.querySelector('[data-live-hud-action="copy-coords"]');
   const liveEditorHudResetButton = liveEditorHud.querySelector('[data-live-hud-action="reset-coords"]');
   const liveEditorHudVisibilityButton = liveEditorHud.querySelector('[data-live-hud-action="reset-visibility"]');
+  const liveEditorQuickbar = document.createElement("div");
+  liveEditorQuickbar.className = "live-editor-quickbar";
+  liveEditorQuickbar.innerHTML = `
+    <button type="button" class="live-editor-quickbar__btn" data-live-quick-action="edit">Edit</button>
+    <button type="button" class="live-editor-quickbar__btn" data-live-quick-action="duplicate">Duplicate</button>
+    <button type="button" class="live-editor-quickbar__btn" data-live-quick-action="toggle-visibility">Hide</button>
+    <button type="button" class="live-editor-quickbar__btn danger" data-live-quick-action="remove">Remove</button>
+    <button type="button" class="live-editor-quickbar__btn" data-live-quick-action="reset-pos">Reset position</button>
+  `;
+  const liveEditorQuickbarVisibilityButton = liveEditorQuickbar.querySelector('[data-live-quick-action="toggle-visibility"]');
   const liveEditorGuideVertical = document.createElement("div");
   liveEditorGuideVertical.className = "live-editor-guide live-editor-guide--vertical";
   const liveEditorGuideHorizontal = document.createElement("div");
@@ -1318,6 +1328,44 @@
     if (!liveEditorStatus) return;
     liveEditorStatus.textContent = message;
     liveEditorStatus.setAttribute("data-tone", tone);
+  };
+
+  const updateLiveEditorQuickbarVisibilityLabel = () => {
+    if (!(liveEditorQuickbarVisibilityButton instanceof HTMLButtonElement) || !selectedNodeKey) return;
+    const profile = getActiveViewportProfile();
+    const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
+    const isHidden = getTextOverride(hiddenKey, "all") === "1";
+    liveEditorQuickbarVisibilityButton.textContent = isHidden ? "Show" : "Hide";
+  };
+
+  const updateLiveEditorQuickbarPosition = () => {
+    if (!(selectedNode instanceof HTMLElement) || !selectedNodeKey) {
+      liveEditorQuickbar.classList.remove("is-visible");
+      return;
+    }
+
+    updateLiveEditorQuickbarVisibilityLabel();
+
+    const rect = selectedNode.getBoundingClientRect();
+    const panelWidth = liveEditorRoot instanceof HTMLElement
+      ? Math.round(liveEditorRoot.getBoundingClientRect().width)
+      : 0;
+    const maxRight = Math.max(16, window.innerWidth - panelWidth - 16);
+
+    let left = Math.round(rect.left + rect.width / 2);
+    let top = Math.round(rect.top - 14);
+
+    if (!Number.isFinite(left) || !Number.isFinite(top) || (rect.width <= 2 && rect.height <= 2)) {
+      left = Math.max(26, maxRight - 160);
+      top = 74;
+    }
+
+    const clampedLeft = Math.min(maxRight, Math.max(16, left));
+    const clampedTop = Math.min(window.innerHeight - 18, Math.max(56, top));
+
+    liveEditorQuickbar.style.left = `${clampedLeft}px`;
+    liveEditorQuickbar.style.top = `${clampedTop}px`;
+    liveEditorQuickbar.classList.add("is-visible");
   };
 
   const showLiveEditorHud = ({ key, x, y }) => {
@@ -1402,6 +1450,7 @@
 
     selectedNode.style.transform = "translate(0px, 0px)";
     showLiveEditorHud({ key: selectedNodeKey, x: 0, y: 0 });
+    updateLiveEditorQuickbarPosition();
     await saveLayoutTranslate(selectedNodeKey, selectedNode);
     setLiveEditorStatus(`Reset ${selectedNodeKey} to 0,0 on ${getActiveBreakpoint()}`, "success");
   };
@@ -1576,6 +1625,198 @@
     }
 
     updateSelectedTypographyControls();
+    updateLiveEditorQuickbarPosition();
+  };
+
+  const beginInlineTextEditing = (node, details, activeLang) => {
+    if (!(node instanceof HTMLElement)) return;
+
+    const originalText = node.textContent || "";
+    node.setAttribute("contenteditable", "true");
+    node.classList.add("key-inspector__focus");
+    node.focus();
+
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    setLiveEditorStatus(`Editing ${details.key} — press Enter to save, Esc to cancel.`, "info");
+
+    const cleanup = () => {
+      node.removeAttribute("contenteditable");
+      node.removeEventListener("blur", onBlur);
+      node.removeEventListener("keydown", onKeydown);
+    };
+
+    const cancelEdit = () => {
+      node.textContent = originalText;
+      cleanup();
+      applyLanguage(activeLang);
+      setLiveEditorStatus("Edit canceled.", "info");
+    };
+
+    const saveEdit = async () => {
+      const updatedText = (node.textContent || "").trim();
+      const save = await saveLiveOverride({
+        key: details.key,
+        value: updatedText,
+        type: "text",
+        language: activeLang
+      });
+
+      if (!save.ok) {
+        node.textContent = originalText;
+        cleanup();
+        applyLanguage(activeLang);
+        setLiveEditorStatus(`Save failed: ${save.message}`, "error");
+        return;
+      }
+
+      if (!siteContentOverrides.textByKey[details.key]) {
+        siteContentOverrides.textByKey[details.key] = {};
+      }
+      siteContentOverrides.textByKey[details.key][activeLang] = updatedText;
+      cleanup();
+      applyLanguage(activeLang);
+      setLiveEditorStatus(`Saved ${details.key} (${activeLang.toUpperCase()})`, "success");
+    };
+
+    const onBlur = () => {
+      void saveEdit();
+    };
+
+    const onKeydown = (keyboardEvent) => {
+      if (keyboardEvent.key === "Enter") {
+        keyboardEvent.preventDefault();
+        node.blur();
+      }
+      if (keyboardEvent.key === "Escape") {
+        keyboardEvent.preventDefault();
+        cancelEdit();
+      }
+    };
+
+    node.addEventListener("blur", onBlur, { once: true });
+    node.addEventListener("keydown", onKeydown);
+  };
+
+  const editNodeByDetails = async (node, details) => {
+    if (!details?.key) return;
+
+    const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
+
+    if (details.type === "layout") {
+      setLiveEditorStatus(`Selected ${details.key}. Drag to move.`, "info");
+      return;
+    }
+
+    if (details.type === "image") {
+      const wantsUpload = window.confirm(
+        `Edit image for ${details.key}\n\nOK = upload from local computer\nCancel = use image URL`
+      );
+
+      if (wantsUpload) {
+        try {
+          const file = await selectLocalImageFile();
+          if (!file) {
+            setLiveEditorStatus("Image upload canceled.", "info");
+            return;
+          }
+
+          const optimized = await optimizeImageFileForWeb(file);
+          const save = await saveLiveOverride({
+            key: details.key,
+            value: optimized.dataUrl,
+            type: "image",
+            language: "all"
+          });
+
+          if (!save.ok) {
+            setLiveEditorStatus(`Upload failed: ${save.message}`, "error");
+            return;
+          }
+
+          siteContentOverrides.imageByKey[details.key] = optimized.dataUrl;
+          applyImageOverrides();
+          setLiveEditorStatus(
+            `Uploaded + optimized ${details.key} (${optimized.width}×${optimized.height}, ~${optimized.estimatedKb}KB)`,
+            "success"
+          );
+          return;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Could not process the selected image.";
+          setLiveEditorStatus(message, "error");
+          return;
+        }
+      }
+
+      const nextUrl = window.prompt(`Edit image URL for ${details.key}:`, details.value || "");
+      if (nextUrl === null) {
+        return;
+      }
+
+      const trimmed = nextUrl.trim();
+      if (!trimmed) {
+        const deletion = await deleteLiveOverride({ key: details.key, type: "image", language: "all" });
+        if (!deletion.ok) {
+          setLiveEditorStatus(`Delete failed: ${deletion.message}`, "error");
+          return;
+        }
+        delete siteContentOverrides.imageByKey[details.key];
+        setLiveEditorStatus(`Deleted ${details.key}. Reloading...`, "success");
+        window.location.reload();
+        return;
+      }
+
+      if (!/^https?:\/\//i.test(trimmed)) {
+        setLiveEditorStatus("Image URL must start with http:// or https://", "error");
+        return;
+      }
+
+      const save = await saveLiveOverride({ key: details.key, value: trimmed, type: "image", language: "all" });
+      if (!save.ok) {
+        setLiveEditorStatus(`Save failed: ${save.message}`, "error");
+        return;
+      }
+
+      siteContentOverrides.imageByKey[details.key] = trimmed;
+      applyImageOverrides();
+      setLiveEditorStatus(`Saved image ${details.key}`, "success");
+      return;
+    }
+
+    if (details.type === "placeholder" || details.type === "icon") {
+      const promptLabel = details.type === "icon" ? "Edit icon name" : "Edit placeholder";
+      const placeholderText = window.prompt(`${promptLabel} for ${details.key}:`, details.value || "");
+      if (placeholderText === null) {
+        return;
+      }
+
+      const savePlaceholder = await saveLiveOverride({
+        key: details.key,
+        value: placeholderText.trim(),
+        type: "text",
+        language: activeLang
+      });
+
+      if (!savePlaceholder.ok) {
+        setLiveEditorStatus(`Save failed: ${savePlaceholder.message}`, "error");
+        return;
+      }
+
+      if (!siteContentOverrides.textByKey[details.key]) {
+        siteContentOverrides.textByKey[details.key] = {};
+      }
+      siteContentOverrides.textByKey[details.key][activeLang] = placeholderText.trim();
+      applyLanguage(activeLang);
+      setLiveEditorStatus(`Saved ${details.key} (${activeLang.toUpperCase()})`, "success");
+      return;
+    }
+
+    beginInlineTextEditing(node, details, activeLang);
   };
 
   const getTranslateFromElement = (el) => {
@@ -2135,6 +2376,7 @@
         : aligned.nextY;
       el.style.transform = `translate(${nextX}px, ${nextY}px)`;
       showLiveEditorHud({ key, x: nextX, y: nextY });
+      updateLiveEditorQuickbarPosition();
     };
 
     const onUp = async () => {
@@ -2234,6 +2476,7 @@
   if (editorParam === "1") {
     document.body.appendChild(liveEditorRoot);
     document.body.appendChild(liveEditorHud);
+    document.body.appendChild(liveEditorQuickbar);
     document.body.appendChild(liveEditorGuideVertical);
     document.body.appendChild(liveEditorGuideHorizontal);
     document.body.classList.add("live-editor-enabled");
@@ -2278,6 +2521,62 @@
       void resetSelectedVisibility();
     });
   }
+
+  liveEditorQuickbar.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const action = target.getAttribute("data-live-quick-action");
+    if (!action) return;
+
+    if (!selectedNodeKey || !(selectedNode instanceof HTMLElement)) {
+      setLiveEditorStatus("Select an element first.", "info");
+      return;
+    }
+
+    if (action === "edit") {
+      const details = getInspectorDetails(selectedNode);
+      await editNodeByDetails(selectedNode, details);
+      return;
+    }
+
+    if (action === "duplicate") {
+      await duplicateSelectedNode();
+      return;
+    }
+
+    if (action === "remove") {
+      await removeSelectedNode();
+      updateLiveEditorQuickbarPosition();
+      return;
+    }
+
+    if (action === "reset-pos") {
+      await resetSelectedCoords();
+      return;
+    }
+
+    if (action === "toggle-visibility") {
+      const profile = getActiveViewportProfile();
+      const hiddenKey = `layout.${selectedNodeKey}.hidden.${profile}`;
+      const isHidden = getTextOverride(hiddenKey, "all") === "1";
+
+      if (isHidden) {
+        await deleteLiveOverride({ key: hiddenKey, type: "text", language: "all" });
+        delete siteContentOverrides.textByKey[hiddenKey];
+      } else {
+        await saveLiveOverride({ key: hiddenKey, value: "1", type: "text", language: "all" });
+        if (!siteContentOverrides.textByKey[hiddenKey]) {
+          siteContentOverrides.textByKey[hiddenKey] = {};
+        }
+        siteContentOverrides.textByKey[hiddenKey].all = "1";
+      }
+
+      applyLayoutOverrides();
+      updateLiveEditorQuickbarPosition();
+      setLiveEditorStatus(`${isHidden ? "Shown" : "Hidden"} ${selectedNodeKey} on ${profile}`, "success");
+    }
+  });
 
   if (liveResolutionInput instanceof HTMLInputElement) {
     liveResolutionInput.addEventListener("input", () => {
@@ -2885,8 +3184,6 @@
         setSelectedNode(node, details.key);
       }
 
-      const activeLang = localStorage.getItem("site-language") || detectPreferredLanguage();
-
       if (details.type === "layout") {
         setLiveEditorStatus(`Selected ${details.key}. Drag to move.`, "info");
         event.preventDefault();
@@ -2894,201 +3191,15 @@
         return;
       }
 
+      if (details.type === "image" && /^hero\.slide\.\d+$/.test(details.key)) {
+        selectedHeroSlideKey = details.key;
+      }
+
       if (details.type === "image") {
-        if (/^hero\.slide\.\d+$/.test(details.key)) {
-          selectedHeroSlideKey = details.key;
-          setLiveEditorStatus(`Selected ${details.key}`, "info");
-        }
-
-        const wantsUpload = window.confirm(
-          `Edit image for ${details.key}\n\nOK = upload from local computer\nCancel = use image URL`
-        );
-
-        if (wantsUpload) {
-          try {
-            const file = await selectLocalImageFile();
-            if (!file) {
-              setLiveEditorStatus("Image upload canceled.", "info");
-              event.preventDefault();
-              event.stopPropagation();
-              return;
-            }
-
-            const optimized = await optimizeImageFileForWeb(file);
-            const save = await saveLiveOverride({
-              key: details.key,
-              value: optimized.dataUrl,
-              type: "image",
-              language: "all"
-            });
-
-            if (!save.ok) {
-              setLiveEditorStatus(`Upload failed: ${save.message}`, "error");
-              return;
-            }
-
-            siteContentOverrides.imageByKey[details.key] = optimized.dataUrl;
-            applyImageOverrides();
-            setLiveEditorStatus(
-              `Uploaded + optimized ${details.key} (${optimized.width}×${optimized.height}, ~${optimized.estimatedKb}KB)`,
-              "success"
-            );
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          } catch (error) {
-            const message = error instanceof Error ? error.message : "Could not process the selected image.";
-            setLiveEditorStatus(message, "error");
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          }
-        }
-
-        const nextUrl = window.prompt(`Edit image URL for ${details.key}:`, details.value || "");
-        if (nextUrl === null) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-
-        const trimmed = nextUrl.trim();
-        if (!trimmed) {
-          const deletion = await deleteLiveOverride({ key: details.key, type: "image", language: "all" });
-          if (!deletion.ok) {
-            setLiveEditorStatus(`Delete failed: ${deletion.message}`, "error");
-            return;
-          }
-          delete siteContentOverrides.imageByKey[details.key];
-          setLiveEditorStatus(`Deleted ${details.key}. Reloading...`, "success");
-          window.location.reload();
-          return;
-        }
-
-        if (!/^https?:\/\//i.test(trimmed)) {
-          setLiveEditorStatus("Image URL must start with http:// or https://", "error");
-          return;
-        }
-
-        const save = await saveLiveOverride({ key: details.key, value: trimmed, type: "image", language: "all" });
-        if (!save.ok) {
-          setLiveEditorStatus(`Save failed: ${save.message}`, "error");
-          return;
-        }
-
-        siteContentOverrides.imageByKey[details.key] = trimmed;
-        applyImageOverrides();
-        setLiveEditorStatus(`Saved image ${details.key}`, "success");
-        event.preventDefault();
-        event.stopPropagation();
-        return;
+        setLiveEditorStatus(`Selected ${details.key}. Double-click (or Edit) to change image.`, "info");
+      } else {
+        setLiveEditorStatus(`Selected ${details.key}. Double-click (or Edit) to modify.`, "info");
       }
-
-      if (details.type === "placeholder" || details.type === "icon") {
-        const promptLabel = details.type === "icon" ? "Edit icon name" : "Edit placeholder";
-        const placeholderText = window.prompt(`${promptLabel} for ${details.key}:`, details.value || "");
-        if (placeholderText === null) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-
-        const savePlaceholder = await saveLiveOverride({
-          key: details.key,
-          value: placeholderText.trim(),
-          type: "text",
-          language: activeLang
-        });
-
-        if (!savePlaceholder.ok) {
-          setLiveEditorStatus(`Save failed: ${savePlaceholder.message}`, "error");
-          return;
-        }
-
-        if (!siteContentOverrides.textByKey[details.key]) {
-          siteContentOverrides.textByKey[details.key] = {};
-        }
-        siteContentOverrides.textByKey[details.key][activeLang] = placeholderText.trim();
-        applyLanguage(activeLang);
-        setLiveEditorStatus(`Saved ${details.key} (${activeLang.toUpperCase()})`, "success");
-
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      if (!(node instanceof HTMLElement)) return;
-
-      const originalText = node.textContent || "";
-      node.setAttribute("contenteditable", "true");
-      node.classList.add("key-inspector__focus");
-      node.focus();
-
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      range.collapse(false);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-
-      setLiveEditorStatus(`Editing ${details.key} — press Enter to save, Esc to cancel.`, "info");
-
-      const cleanup = () => {
-        node.removeAttribute("contenteditable");
-        node.removeEventListener("blur", onBlur);
-        node.removeEventListener("keydown", onKeydown);
-      };
-
-      const cancelEdit = () => {
-        node.textContent = originalText;
-        cleanup();
-        applyLanguage(activeLang);
-        setLiveEditorStatus("Edit canceled.", "info");
-      };
-
-      const saveEdit = async () => {
-        const updatedText = (node.textContent || "").trim();
-        const save = await saveLiveOverride({
-          key: details.key,
-          value: updatedText,
-          type: "text",
-          language: activeLang
-        });
-
-        if (!save.ok) {
-          node.textContent = originalText;
-          cleanup();
-          applyLanguage(activeLang);
-          setLiveEditorStatus(`Save failed: ${save.message}`, "error");
-          return;
-        }
-
-        if (!siteContentOverrides.textByKey[details.key]) {
-          siteContentOverrides.textByKey[details.key] = {};
-        }
-        siteContentOverrides.textByKey[details.key][activeLang] = updatedText;
-        cleanup();
-        applyLanguage(activeLang);
-        setLiveEditorStatus(`Saved ${details.key} (${activeLang.toUpperCase()})`, "success");
-      };
-
-      const onBlur = () => {
-        void saveEdit();
-      };
-
-      const onKeydown = (keyboardEvent) => {
-        if (keyboardEvent.key === "Enter") {
-          keyboardEvent.preventDefault();
-          node.blur();
-        }
-        if (keyboardEvent.key === "Escape") {
-          keyboardEvent.preventDefault();
-          cancelEdit();
-        }
-      };
-
-      node.addEventListener("blur", onBlur, { once: true });
-      node.addEventListener("keydown", onKeydown);
 
       event.preventDefault();
       event.stopPropagation();
@@ -3117,6 +3228,21 @@
     }
 
     setInspectorStatus("Could not copy to clipboard. Please try again.", "error");
+  }, true);
+
+  document.addEventListener("dblclick", (event) => {
+    if (!liveEditorEnabled) return;
+    if (liveEditorRoot.contains(event.target) || liveEditorHud.contains(event.target) || liveEditorQuickbar.contains(event.target) || inspectorRoot.contains(event.target)) return;
+
+    const node = getInspectorNode(event.target);
+    if (!(node instanceof HTMLElement)) return;
+
+    const details = getInspectorDetails(node);
+    if (!details.key || details.type === "layout") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    void editNodeByDetails(node, details);
   }, true);
 
   document.addEventListener("keydown", (event) => {
@@ -3253,11 +3379,13 @@
       updateVisibilityButtons();
     }
     applyLayoutOverrides();
+    updateLiveEditorQuickbarPosition();
   });
 
   window.addEventListener("scroll", () => {
     if (editorParam !== "1" || !liveCanvasMode) return;
     updateCanvasMinimap();
+    updateLiveEditorQuickbarPosition();
   }, { passive: true });
 
   const setMenuState = (open) => {

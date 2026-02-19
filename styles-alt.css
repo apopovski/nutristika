@@ -2122,12 +2122,71 @@ body.live-editor-enabled .footer {
   border-top: 1px dashed rgba(255, 143, 43, 0.95);
 }
 
+.live-editor-quickbar {
+  position: fixed;
+  z-index: 127;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem;
+  border: 1.5px solid rgba(17, 17, 17, 0.2);
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.9);
+  box-shadow: 0 16px 28px rgba(17, 17, 17, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.live-editor-quickbar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.live-editor-quickbar__btn {
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.48rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.live-editor-quickbar__btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.live-editor-quickbar__btn.danger {
+  border-color: rgba(255, 79, 69, 0.58);
+  background: rgba(255, 79, 69, 0.2);
+}
+
+.live-editor-quickbar__btn.danger:hover {
+  background: rgba(255, 79, 69, 0.32);
+}
+
 body.live-editor-enabled [data-i18n],
 body.live-editor-enabled [data-i18n-placeholder],
 body.live-editor-enabled [data-image-key],
 body.live-editor-enabled [data-icon-key],
 body.live-editor-enabled [data-layout-key] {
   cursor: pointer;
+}
+
+body.live-editor-enabled [data-i18n]:hover,
+body.live-editor-enabled [data-i18n-placeholder]:hover,
+body.live-editor-enabled [data-image-key]:hover,
+body.live-editor-enabled [data-icon-key]:hover,
+body.live-editor-enabled [data-layout-key]:hover {
+  outline: 2px dashed rgba(17, 17, 17, 0.28);
+  outline-offset: 2px;
 }
 
 body.live-editor-enabled .key-inspector__toggle[data-active="true"] {
@@ -2249,6 +2308,15 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
     right: 0.7rem;
     top: 0.7rem;
     max-width: calc(100vw - 1.4rem);
+  }
+
+  .live-editor-quickbar {
+    left: 50% !important;
+    top: auto !important;
+    bottom: 0.8rem;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 1.4rem);
+    overflow-x: auto;
   }
 }
 
