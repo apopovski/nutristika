@@ -3513,6 +3513,18 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   padding: 0.16rem 0.28rem;
 }
 
+.live-editor-command__preview {
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 8px;
+  background: rgba(246, 250, 248, 0.9);
+  color: #2f3f39;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 0.56rem;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  padding: 0.28rem 0.38rem;
+}
+
 body.live-editor-command-open {
   overflow: hidden;
 }

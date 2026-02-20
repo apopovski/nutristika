@@ -1618,11 +1618,13 @@
         <span class="live-editor-command__cheat"><kbd>↑</kbd><kbd>↓</kbd><span>Navigate</span></span>
         <span class="live-editor-command__cheat"><kbd>Esc</kbd><span>Close</span></span>
       </div>
+      <p class="live-editor-command__preview" data-live-command-preview>Preview: choose an action to see details.</p>
       <p class="live-editor-command__hint">Tip: start typing and press Tab to complete the top command.</p>
     </div>
   `;
   const liveEditorCommandInput = liveEditorCommandPalette.querySelector("#live-editor-command-input");
   const liveEditorCommandList = liveEditorCommandPalette.querySelector("[data-live-command-list]");
+  const liveEditorCommandPreview = liveEditorCommandPalette.querySelector("[data-live-command-preview]");
   const liveEditorContextMenuVisibilityButton = liveEditorContextMenu.querySelector('[data-live-context-action="toggle-visibility"]');
   let selectedHeroSlideKey = "";
   let selectedNodeKey = "";
@@ -2114,14 +2116,32 @@
     const animate = options?.animate !== false;
     const previousIndex = liveEditorCommandActiveIndex;
 
+    const updateLiveCommandPreview = (item) => {
+      if (!(liveEditorCommandPreview instanceof HTMLElement)) return;
+      if (!item) {
+        liveEditorCommandPreview.textContent = "Preview: choose an action to see details.";
+        return;
+      }
+
+      const label = String(item.label || "Action").trim();
+      const category = String(item.category || "Actions").trim();
+      const meta = String(item.meta || "action").trim();
+      const shortcut = String(item.shortcut || "").trim();
+      liveEditorCommandPreview.textContent = shortcut
+        ? `Preview: ${label} · ${category} · ${meta} · ${shortcut}`
+        : `Preview: ${label} · ${category} · ${meta}`;
+    };
+
     if (!(liveEditorCommandList instanceof HTMLElement) || !liveEditorCommandFilteredActions.length) {
       liveEditorCommandActiveIndex = 0;
+      updateLiveCommandPreview(null);
       return;
     }
 
     const max = liveEditorCommandFilteredActions.length - 1;
     const safeIndex = Math.min(max, Math.max(0, nextIndex));
     liveEditorCommandActiveIndex = safeIndex;
+    updateLiveCommandPreview(liveEditorCommandFilteredActions[safeIndex] || null);
 
     const rows = [...liveEditorCommandList.querySelectorAll(".live-editor-command__item")]
       .filter((node) => node instanceof HTMLButtonElement);
@@ -2286,6 +2306,9 @@
       applyLiveCommandReveal(empty);
       liveEditorCommandList.appendChild(empty);
       liveEditorCommandActiveIndex = 0;
+      if (liveEditorCommandPreview instanceof HTMLElement) {
+        liveEditorCommandPreview.textContent = "Preview: no command available for this query.";
+      }
       return;
     }
 
@@ -2403,6 +2426,10 @@
 
     if (focusSearch && liveActionSearchInput instanceof HTMLInputElement) {
       liveActionSearchInput.focus({ preventScroll: true });
+    }
+
+    if (liveEditorCommandPreview instanceof HTMLElement) {
+      liveEditorCommandPreview.textContent = "Preview: choose an action to see details.";
     }
   };
 
