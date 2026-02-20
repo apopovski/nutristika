@@ -3304,12 +3304,18 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
 }
 
 .live-editor-command__group {
+  position: sticky;
+  top: -0.02rem;
+  z-index: 2;
   font-size: 0.53rem;
   font-weight: 800;
   letter-spacing: 0.055em;
   text-transform: uppercase;
   color: #395148;
-  padding: 0.08rem 0.18rem 0.02rem;
+  background: linear-gradient(180deg, rgba(247, 250, 248, 0.98) 0%, rgba(247, 250, 248, 0.9) 100%);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+  padding: 0.16rem 0.18rem 0.12rem;
 }
 
 .live-editor-command__list::-webkit-scrollbar {
