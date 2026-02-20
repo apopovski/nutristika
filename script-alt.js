@@ -2110,7 +2110,10 @@
     return score;
   };
 
-  const setLiveCommandActiveItem = (nextIndex) => {
+  const setLiveCommandActiveItem = (nextIndex, options = {}) => {
+    const animate = options?.animate !== false;
+    const previousIndex = liveEditorCommandActiveIndex;
+
     if (!(liveEditorCommandList instanceof HTMLElement) || !liveEditorCommandFilteredActions.length) {
       liveEditorCommandActiveIndex = 0;
       return;
@@ -2126,6 +2129,11 @@
     rows.forEach((row, index) => {
       row.setAttribute("data-active", String(index === safeIndex));
       if (index === safeIndex) {
+        if (animate && previousIndex !== safeIndex) {
+          row.classList.remove("is-pulse");
+          void row.offsetWidth;
+          row.classList.add("is-pulse");
+        }
         row.scrollIntoView({ block: "nearest" });
       }
     });
@@ -2384,7 +2392,7 @@
       });
     });
 
-    setLiveCommandActiveItem(0);
+    setLiveCommandActiveItem(0, { animate: false });
   };
 
   const closeLiveCommandPalette = ({ focusSearch = false } = {}) => {
