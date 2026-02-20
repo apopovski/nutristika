@@ -3303,6 +3303,24 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
   padding-right: 0.1rem;
 }
 
+.live-editor-command__list > li.is-reveal {
+  opacity: 0;
+  transform: translateY(4px) scale(0.995);
+  animation: liveCommandReveal 0.2s ease-out both;
+  animation-delay: var(--live-cmd-reveal-delay, 0ms);
+}
+
+@keyframes liveCommandReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .live-editor-command__group {
   position: sticky;
   top: -0.02rem;
@@ -3478,6 +3496,14 @@ body.live-editor-enabled [data-layout-key][data-live-selected="true"] {
 
 body.live-editor-command-open {
   overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-editor-command__list > li.is-reveal {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
 }
 
 @media (max-width: 640px) {

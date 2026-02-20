@@ -2262,11 +2262,20 @@
         });
 
     liveEditorCommandList.innerHTML = "";
+    let revealOrder = 0;
+
+    const applyLiveCommandReveal = (node) => {
+      if (!(node instanceof HTMLElement)) return;
+      node.style.setProperty("--live-cmd-reveal-delay", `${Math.min(18, revealOrder) * 16}ms`);
+      node.classList.add("is-reveal");
+      revealOrder += 1;
+    };
 
     if (!liveEditorCommandFilteredActions.length) {
       const empty = document.createElement("li");
       empty.className = "live-editor-command__empty";
       empty.textContent = "No matching actions";
+      applyLiveCommandReveal(empty);
       liveEditorCommandList.appendChild(empty);
       liveEditorCommandActiveIndex = 0;
       return;
@@ -2274,6 +2283,7 @@
 
     const renderCommandRow = (item, index) => {
       const li = document.createElement("li");
+      li.className = "live-editor-command__row";
       const button = document.createElement("button");
       button.type = "button";
       button.className = "live-editor-command__item";
@@ -2313,6 +2323,7 @@
       button.appendChild(main);
       button.appendChild(meta);
       li.appendChild(button);
+      applyLiveCommandReveal(li);
       liveEditorCommandList.appendChild(li);
     };
 
@@ -2320,6 +2331,7 @@
       const li = document.createElement("li");
       li.className = "live-editor-command__group";
       li.textContent = title;
+      applyLiveCommandReveal(li);
       liveEditorCommandList.appendChild(li);
     };
 
